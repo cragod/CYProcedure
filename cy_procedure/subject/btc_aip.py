@@ -106,7 +106,7 @@ class OKexBTCAIP:
         # 实际定投数
         invest_amount = ratio * self.__invest_base_amount
         self.recorder.append_summary_log('定投额({} * {})：{} {}'.format(self.__invest_base_amount,
-                                                                     ratio, invest_amount), self.coin_pair.base_coin.upper())
+                                                                     ratio, invest_amount, self.coin_pair.base_coin.upper()))
         self.__invest_proccess(invest_amount)
 
     def __invest_proccess(self, invest_amount):
