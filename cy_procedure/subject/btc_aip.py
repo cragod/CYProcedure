@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 
 from ..generic.fetching import *
 from ..util.logger import ProcedureRecorder
