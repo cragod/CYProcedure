@@ -170,7 +170,7 @@ class OKexBTCAIP:
         msg = """下单价格：{} \n
 下单总价：{} \n
 买入数量：{}
-""".format(round(price, 6), round(cost, 6), round(buy_amount, 7))
+""".format(round(price, 6), round(cost, 6), round(buy_amount, 10))
         self.recorder.append_summary_log(msg)
         # bb->ybb
         if not self.__transfer_amount(buy_amount, self.coin_pair.trade_coin.lower(), 1, 8):
