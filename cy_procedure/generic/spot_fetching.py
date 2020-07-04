@@ -1,5 +1,4 @@
 from enum import IntEnum
-from datetime import datetime
 from cy_components.helpers.formatter import DateFormatter
 from cy_widgets.fetcher.exchange import *
 
@@ -22,21 +21,19 @@ class ExchangeFetchingConfiguration:
     """
 
     def __init__(self,
-                 coin_pair=None,
+                 coin_pair: CoinPair = None,
                  time_frame=TimeFrame.Minute_5,
                  sleep_duration=5,
-                 begin_date=datetime.now(),
                  op_type=ExchangeFetchingType.HISTORICAL,
                  fetching_by_ccxt=True,
                  debug=False):
         super().__init__()
         assert coin_pair is not None
         assert time_frame is not None
-        assert sleep_duration >= 3
+        assert sleep_duration > 0
 
         self.coin_pair = coin_pair
         self.time_frame = time_frame
-        self.begin_date = begin_date
         self.op_type = op_type
         self.sleep_duration = sleep_duration
         self.fetching_by_ccxt = fetching_by_ccxt
