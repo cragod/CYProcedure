@@ -1,7 +1,6 @@
 import os
-from pathlib import Path
-from ..generic.fetching import *
-from cy_widgets.exchange.provider import ExchangeType
+from datetime import datetime
+from ..generic.spot_fetching import *
 
 
 class HistoricalSpotCandle:

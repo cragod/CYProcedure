@@ -1,6 +1,6 @@
 import pandas as pd
-
-from ..generic.fetching import *
+from datetime import datetime
+from ..generic.spot_fetching import *
 from ..util.logger import ProcedureRecorder
 from cy_widgets.trader.exchange_trader import *
 from cy_widgets.logger.trading import *

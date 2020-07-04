@@ -1,5 +1,4 @@
 from enum import IntEnum
-from datetime import datetime
 from cy_components.helpers.formatter import DateFormatter
 from cy_widgets.fetcher.exchange import *
 
