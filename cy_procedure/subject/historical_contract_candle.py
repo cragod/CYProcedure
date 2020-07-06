@@ -1,4 +1,3 @@
-import os
 import pandas as pd
 from datetime import datetime
 from cy_components.defines.column_names import *
@@ -6,10 +5,9 @@ from ..generic.contract_fetching import *
 
 
 class HistoricalContractCandle:
-    def __init__(self, coin_pair, time_frame, exchange_type, contract_type, start_date='2020-03-03 00:00:00', end_date=None, save_path=None, save_daily=True):
+    def __init__(self, coin_pair, time_frame, exchange_type, contract_type, start_date='2020-03-03 00:00:00', end_date=None, persistence_df=None):
         self.__df = pd.DataFrame()
-        self.save_path = save_path
-        self.save_daily = save_daily
+        self.__persistence_df = persistence_df
         # 时间区间
         self.start_date = DateFormatter.convert_string_to_local_date(start_date)
         self.end_date = DateFormatter.convert_string_to_local_date(end_date) if end_date is not None else datetime.now()
@@ -59,17 +57,6 @@ class HistoricalContractCandle:
                                   & (self.__df[COL_CANDLE_BEGIN_TIME] <= self.end_date)]
             self.__df.set_index(COL_CANDLE_BEGIN_TIME, inplace=True)
             print(self.__df)
-            if self.save_path is not None:
-                self.__save_df_to_csv()
+            if self.__persistence_df is not None:
+                self.__persistence_df(self.__df)
         return not stop
-
-    def __save_df_to_csv(self):
-        # (BASE_PATH)/okex/2020-3-17/BTC-USDT-200317.csv
-        path = "{}/{}".format(self.save_path, self.provider.ccxt_object_for_fetching.id)
-        os.path.join(path)
-        if self.save_daily:
-            path = path + '/' + DateFormatter.convert_local_date_to_string(self.start_date, '%Y-%m-%d')
-        if not os.path.exists(path):
-            os.makedirs(path, exist_ok=True)
-        path = "{}/{}-{}.csv".format(path, self.config.coin_pair.formatted('-'), self.config.time_frame.value.upper())
-        self.__df.to_csv(path)
