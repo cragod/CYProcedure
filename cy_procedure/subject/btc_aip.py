@@ -1,5 +1,5 @@
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from ..generic.spot_fetching import *
 from ..util.logger import ProcedureRecorder
 from cy_widgets.trader.exchange_trader import *
@@ -19,7 +19,8 @@ class OKexBTCAIP:
                  start_index,
                  trader_provider,
                  invest_base_amount,
-                 recorder: ProcedureRecorder):
+                 recorder: ProcedureRecorder,
+                 debug=False):
         """余币宝转出USDT + 定投买入 + 余币宝转入BTC
 
         Parameters
@@ -49,8 +50,9 @@ class OKexBTCAIP:
         self.recorder = recorder
         self.coin_pair = coin_pair
         self.recorder.append_summary_log('定投 - BTC')
-        # 默认先获取历史
-        self.configuration = ExchangeFetchingConfiguration(coin_pair, time_frame, 3)
+        # 直接从远往近抓
+        self.configuration = ExchangeFetchingConfiguration(
+            coin_pair, time_frame, 3, ExchangeFetchingType.FILL_RECENTLY, debug=debug)
         # 策略参数
         self.interval_days = interval_days
         self.ma_periods = ma_periods
@@ -69,16 +71,15 @@ class OKexBTCAIP:
     def __fetch_candle(self):
         procedure = ExchangeFetchingProcedure(ExchangeFetcher(self.signal_provider),
                                               self.configuration,
-                                              self.__get_earliest_date,
+                                              None,
                                               self.__get_latest_date,
                                               self.__save_df)
 
-        # Historical
+        # Fill to Latest
         procedure.run_task()
 
-        # Fill to Latest
-        procedure.configuration.op_type = ExchangeFetchingType.FILL_RECENTLY
-        procedure.run_task()
+        if self.configuration.debug:
+            print(self.__df)
 
         self.recorder.record_procedure("获取 K 线成功")
 
@@ -201,15 +202,10 @@ class OKexBTCAIP:
         })
         return response['result']
 
-    def __get_earliest_date(self):
-        if self.__df.shape[0] > 0:
-            return self.__df[COL_CANDLE_BEGIN_TIME][0]
-        return datetime.now()
-
     def __get_latest_date(self):
         if self.__df.shape[0] > 0:
             return self.__df[COL_CANDLE_BEGIN_TIME].iloc[-1]
-        return datetime.now()
+        return datetime.now() - timedelta(days=self.ma_periods + 15)  # 往前多加15天开始
 
     def __save_df(self, data_df: pd.DataFrame):
         before_count = self.__df.shape[0]
