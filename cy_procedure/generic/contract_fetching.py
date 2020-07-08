@@ -72,8 +72,6 @@ class ContractFetchingProcedure:
         """
         assert fetcher is not None
         assert configuration is not None
-        assert get_earliest_date is not None
-        assert get_latest_date is not None
         assert save_df is not None
 
         self.fetcher = fetcher
@@ -101,6 +99,7 @@ class ContractFetchingProcedure:
     def __fetch_historical_data(self):
         """获取历史记录"""
         while True:
+            assert self.get_earliest_date is not None
             # 获取最早的日期
             earliest_date = self.get_earliest_date()
             # 转为时间戳
@@ -117,6 +116,7 @@ class ContractFetchingProcedure:
     def __fill_recently(self):
         """补齐最近的数据"""
         while True:
+            assert self.get_latest_date is not None
             # 获取已经保存的最新的日期
             recent_date = self.get_latest_date()
             # 转换到时间戳
