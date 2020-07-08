@@ -9,8 +9,9 @@ class HistoricalContractCandle:
         self.__df = pd.DataFrame()
         self.__persistence_df = persistence_df
         # 时间区间
-        self.start_date = DateFormatter.convert_string_to_local_date(start_date)
+        self.start_date = DateFormatter.convert_string_to_local_date(start_date).astimezone()
         self.end_date = DateFormatter.convert_string_to_local_date(end_date) if end_date is not None else datetime.now()
+        self.end_date = self.end_date.astimezone()
         # 抓取使用的配置
         self.provider = CCXTProvider("", "", exchange_type)
         self.config = ContractFetchingConfiguration(
