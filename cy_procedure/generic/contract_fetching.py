@@ -30,6 +30,7 @@ class ContractFetchingConfiguration:
                  sleep_duration=3,
                  op_type=ContractFetchingType.HISTORICAL,
                  contract_type=ContractType.Futures,
+                 per_limit=1000,
                  debug=False):
         super().__init__()
         assert coin_pair is not None
@@ -41,13 +42,12 @@ class ContractFetchingConfiguration:
         self.op_type = op_type
         self.contract_type = contract_type
         self.sleep_duration = sleep_duration
+        self.per_limit = per_limit
         self.debug = debug
 
 
 class ContractFetchingProcedure:
     """抓取数据的一般流程"""
-
-    batch_limit = 1000
 
     def __init__(self,
                  fetcher: BaseContractFetcher,
@@ -72,8 +72,6 @@ class ContractFetchingProcedure:
         """
         assert fetcher is not None
         assert configuration is not None
-        assert get_earliest_date is not None
-        assert get_latest_date is not None
         assert save_df is not None
 
         self.fetcher = fetcher
@@ -90,10 +88,10 @@ class ContractFetchingProcedure:
         # Fetch
         if self.configuration.contract_type == ContractType.Futures:
             df = self.fetcher.fetch_futures_candle_data(self.configuration.coin_pair,
-                                                        self.configuration.time_frame, since_ts, self.batch_limit)
+                                                        self.configuration.time_frame, since_ts, self.configuration.per_limit)
         else:
             df = self.fetcher.fetch_perpetual_candle_data(
-                self.configuration.coin_pair, self.configuration.time_frame, since_ts, self.batch_limit)
+                self.configuration.coin_pair, self.configuration.time_frame, since_ts, self.configuration.per_limit)
         return self.save_df(df)
 
     # Task
@@ -101,12 +99,14 @@ class ContractFetchingProcedure:
     def __fetch_historical_data(self):
         """获取历史记录"""
         while True:
+            assert self.get_earliest_date is not None
             # 获取最早的日期
             earliest_date = self.get_earliest_date()
             # 转为时间戳
             earliest_ts = DateFormatter.convert_local_date_to_timestamp(earliest_date)
             # 确定抓取的起始时间戳
-            since_ts = self.configuration.time_frame.timestamp_backward_offset(earliest_ts, self.batch_limit)
+            since_ts = self.configuration.time_frame.timestamp_backward_offset(
+                earliest_ts, self.configuration.per_limit)
             # 需要继续的，暂停一会儿
             if self.__perform_fetching(since_ts):
                 time.sleep(self.configuration.sleep_duration)
@@ -117,6 +117,7 @@ class ContractFetchingProcedure:
     def __fill_recently(self):
         """补齐最近的数据"""
         while True:
+            assert self.get_latest_date is not None
             # 获取已经保存的最新的日期
             recent_date = self.get_latest_date()
             # 转换到时间戳

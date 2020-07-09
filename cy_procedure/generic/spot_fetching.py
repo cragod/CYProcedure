@@ -26,6 +26,7 @@ class ExchangeFetchingConfiguration:
                  sleep_duration=5,
                  op_type=ExchangeFetchingType.HISTORICAL,
                  fetching_by_ccxt=True,
+                 batch_limit=1000,
                  debug=False):
         super().__init__()
         assert coin_pair is not None
@@ -37,13 +38,12 @@ class ExchangeFetchingConfiguration:
         self.op_type = op_type
         self.sleep_duration = sleep_duration
         self.fetching_by_ccxt = fetching_by_ccxt
+        self.batch_limit = batch_limit if batch_limit > 20 else 50
         self.debug = debug
 
 
 class ExchangeFetchingProcedure:
     """抓取数据的一般流程"""
-
-    batch_limit = 1000
 
     def __init__(self,
                  fetcher: ExchangeFetcher,
@@ -68,8 +68,6 @@ class ExchangeFetchingProcedure:
         """
         assert fetcher is not None
         assert configuration is not None
-        assert get_earliest_date is not None
-        assert get_latest_date is not None
         assert save_df is not None
 
         self.fetcher = fetcher
@@ -88,7 +86,7 @@ class ExchangeFetchingProcedure:
             self.configuration.coin_pair,
             self.configuration.time_frame,
             since_ts,
-            self.batch_limit,
+            self.configuration.batch_limit,
             by_ccxt=self.configuration.fetching_by_ccxt)
         return self.save_df(df)
 
@@ -97,12 +95,14 @@ class ExchangeFetchingProcedure:
     def __fetch_historical_data(self):
         """获取历史记录"""
         while True:
+            assert self.get_earliest_date is not None
             # 获取最早的日期
             earliest_date = self.get_earliest_date()
             # 转为时间戳
             earliest_ts = DateFormatter.convert_local_date_to_timestamp(earliest_date)
             # 确定抓取的起始时间戳
-            since_ts = self.configuration.time_frame.timestamp_backward_offset(earliest_ts, self.batch_limit)
+            since_ts = self.configuration.time_frame.timestamp_backward_offset(
+                earliest_ts, self.configuration.batch_limit)
             # 需要继续的，暂停一会儿
             if self.__perform_fetching(since_ts):
                 time.sleep(self.configuration.sleep_duration)
@@ -113,6 +113,7 @@ class ExchangeFetchingProcedure:
     def __fill_recently(self):
         """补齐最近的数据"""
         while True:
+            assert self.get_latest_date is not None
             # 获取已经保存的最新的日期
             recent_date = self.get_latest_date()
             # 转换到时间戳
