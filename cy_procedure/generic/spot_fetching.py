@@ -26,6 +26,7 @@ class ExchangeFetchingConfiguration:
                  sleep_duration=5,
                  op_type=ExchangeFetchingType.HISTORICAL,
                  fetching_by_ccxt=True,
+                 batch_limit=1000,
                  debug=False):
         super().__init__()
         assert coin_pair is not None
@@ -37,13 +38,12 @@ class ExchangeFetchingConfiguration:
         self.op_type = op_type
         self.sleep_duration = sleep_duration
         self.fetching_by_ccxt = fetching_by_ccxt
+        self.batch_limit = batch_limit if batch_limit > 20 else 50
         self.debug = debug
 
 
 class ExchangeFetchingProcedure:
     """抓取数据的一般流程"""
-
-    batch_limit = 1000
 
     def __init__(self,
                  fetcher: ExchangeFetcher,
@@ -86,7 +86,7 @@ class ExchangeFetchingProcedure:
             self.configuration.coin_pair,
             self.configuration.time_frame,
             since_ts,
-            self.batch_limit,
+            self.configuration.batch_limit,
             by_ccxt=self.configuration.fetching_by_ccxt)
         return self.save_df(df)
 
@@ -101,7 +101,8 @@ class ExchangeFetchingProcedure:
             # 转为时间戳
             earliest_ts = DateFormatter.convert_local_date_to_timestamp(earliest_date)
             # 确定抓取的起始时间戳
-            since_ts = self.configuration.time_frame.timestamp_backward_offset(earliest_ts, self.batch_limit)
+            since_ts = self.configuration.time_frame.timestamp_backward_offset(
+                earliest_ts, self.configuration.batch_limit)
             # 需要继续的，暂停一会儿
             if self.__perform_fetching(since_ts):
                 time.sleep(self.configuration.sleep_duration)

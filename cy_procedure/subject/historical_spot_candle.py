@@ -7,7 +7,7 @@ from ..generic.spot_fetching import *
 
 
 class CSVHistoricalSpotCandle:
-    def __init__(self, coin_pair, time_frame, exchange_type, start_date='2020-03-03 00:00:00', end_date=None, save_path=None):
+    def __init__(self, coin_pair, time_frame, exchange_type, start_date='2020-03-03 00:00:00', end_date=None, save_path=None, per_limit=1000):
         self.__df = pd.DataFrame()
         self.save_path = save_path
         # 时间区间
@@ -16,7 +16,8 @@ class CSVHistoricalSpotCandle:
         self.end_date = self.end_date.astimezone()
         # 抓取使用的配置
         self.provider = CCXTProvider("", "", exchange_type)
-        self.config = ExchangeFetchingConfiguration(coin_pair, time_frame, 1, ExchangeFetchingType.FILL_RECENTLY)
+        self.config = ExchangeFetchingConfiguration(
+            coin_pair, time_frame, 1, ExchangeFetchingType.FILL_RECENTLY, batch_limit=per_limit)
         self.fetcher = ExchangeFetcher(self.provider)
 
     def run_task(self):
@@ -72,14 +73,15 @@ class CSVHistoricalSpotCandle:
 class DBHistoricalSpotCandle:
     """外部连接数据库，内部只负责写入"""
 
-    def __init__(self, coin_pair, time_frame, exchange_type, start_date='2020-03-03 00:00:00', end_date=None):
+    def __init__(self, coin_pair, time_frame, exchange_type, start_date='2020-03-03 00:00:00', end_date=None, per_limit=1000):
         # 时间区间
         self.start_date = DateFormatter.convert_string_to_local_date(start_date).astimezone()
         self.end_date = DateFormatter.convert_string_to_local_date(end_date) if end_date is not None else datetime.now()
         self.end_date = self.end_date.astimezone()
         # 抓取使用的配置
         self.provider = CCXTProvider("", "", exchange_type)
-        self.config = ExchangeFetchingConfiguration(coin_pair, time_frame, 1, ExchangeFetchingType.FILL_RECENTLY)
+        self.config = ExchangeFetchingConfiguration(
+            coin_pair, time_frame, 1, ExchangeFetchingType.FILL_RECENTLY, batch_limit=per_limit)
         self.fetcher = ExchangeFetcher(self.provider)
         # table name
         self.candle_cls = candle_record_class_with_components(self.provider.display_name, coin_pair, time_frame)
@@ -101,5 +103,4 @@ class DBHistoricalSpotCandle:
         json_list = json.loads(df.T.to_json()).values()
         json_list = CandleFormatter.convert_json_timestamp_to_date(json_list, column_name='_id')
         self.candle_cls.bulk_upsert_records(json_list)
-        print(self.start_date, self.end_date)
         return self.start_date < self.end_date
