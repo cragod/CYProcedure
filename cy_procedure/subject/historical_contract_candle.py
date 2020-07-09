@@ -4,7 +4,7 @@ from cy_components.defines.column_names import *
 from ..generic.contract_fetching import *
 
 
-class HistoricalContractCandle:
+class CSVHistoricalContractCandle:
     def __init__(self, coin_pair, time_frame, exchange_type, contract_type, start_date='2020-03-03 00:00:00', end_date=None, persistence_df=None):
         self.__df = pd.DataFrame()
         self.__persistence_df = persistence_df
