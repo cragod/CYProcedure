@@ -14,9 +14,8 @@ class OKexBTCAIP:
                  coin_pair: CoinPair,
                  time_frame,
                  signal_provider,
-                 interval_days,
+                 day_of_week,
                  ma_periods,
-                 start_index,
                  trader_provider,
                  invest_base_amount,
                  recorder: ProcedureRecorder,
@@ -54,9 +53,8 @@ class OKexBTCAIP:
         self.configuration = ExchangeFetchingConfiguration(
             coin_pair, time_frame, 3, ExchangeFetchingType.FILL_RECENTLY, debug=debug)
         # 策略参数
-        self.interval_days = interval_days
+        self.day_of_week = day_of_week
         self.ma_periods = ma_periods
-        self.start_index = start_index
         # 交易
         self.__invest_base_amount = invest_base_amount
 
@@ -85,10 +83,11 @@ class OKexBTCAIP:
 
     def __calculate_signal(self):
         # Calculation
-        strategy = AutoBuyCoinStrategy(interval_day=self.interval_days,
-                                       ma_periods=self.ma_periods,
-                                       start_index=self.start_index)
+        strategy = AutoBuyCoinStrategy(day_of_week=self.day_of_week,
+                                       ma_periods=self.ma_periods)
         signals = strategy.calculate_signals(self.__df, False)
+        if self.configuration.debug:
+            print(signals[-200:])
         date_string = DateFormatter.convert_local_date_to_string(
             signals['candle_begin_time'][self.__df.index[-1]], "%Y-%m-%d")
         actual_ratio = signals['high_change'][self.__df.index[-1]]

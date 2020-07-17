@@ -1,8 +1,8 @@
 import os
-import json
 from datetime import datetime
 from cy_components.helpers.formatter import CandleFormatter
 from cy_data_access.models.market import *
+from cy_data_access.util.convert import convert_df_to_json_list
 from ..generic.spot_fetching import *
 
 
@@ -99,8 +99,6 @@ class DBHistoricalSpotCandle:
         # 最后日期
         self.start_date = df.sort_values(COL_CANDLE_BEGIN_TIME, ascending=False)[COL_CANDLE_BEGIN_TIME].iloc[0]
         # 保存
-        df.rename({COL_CANDLE_BEGIN_TIME: '_id'}, axis=1, inplace=True)
-        json_list = json.loads(df.T.to_json()).values()
-        json_list = CandleFormatter.convert_json_timestamp_to_date(json_list, column_name='_id')
+        json_list = convert_df_to_json_list(df, COL_CANDLE_BEGIN_TIME)
         self.candle_cls.bulk_upsert_records(json_list)
         return self.start_date < self.end_date
