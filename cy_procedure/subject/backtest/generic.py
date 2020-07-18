@@ -16,8 +16,8 @@ class SimpleBacktestProcedure:
         self.__params = params
         self.__position_func = position_func
         self.__evaluation_func = evaluation_func
-        self.__summary_collection_cls = backtest_summary_class(
-            '{}_{}_{}'.format(dfr.convert_local_date_to_string(datetime.now(), '%Y%m%d%H%M%S'), coin_pair.formatted('_').lower(), str(strategy_cls()).lower()))
+        self.__collection_name = '{}_{}_{}'.format(dfr.convert_local_date_to_string(
+            datetime.now(), '%Y%m%d%H%M%S'), coin_pair.formatted('_').lower(), str(strategy_cls()).lower())
 
         self.__start_date = df.iloc[0][COL_CANDLE_BEGIN_TIME]
         self.__end_date = df.iloc[-1][COL_CANDLE_BEGIN_TIME]
@@ -29,7 +29,8 @@ class SimpleBacktestProcedure:
             param = StrategyHelper.formatted_identifier(strategy)
             curve = str(evaluated_df.iloc[-1][COL_EQUITY_CURVE])
             print('finished', param, curve)
-            self.__summary_collection_cls(
+            summary_collection_cls = backtest_summary_class(self.__collection_name)
+            summary_collection_cls(
                 parameter=param,
                 equity_curve=curve,
                 start_date=self.__start_date,
@@ -45,9 +46,9 @@ class SimpleBacktestProcedure:
             print(str(param), str(e))
             return None
 
-    def perform_test_proc(self):
+    def perform_test_proc(self, processes=2):
         # self.calculation(self.__params[0])
-        with Pool(processes=2) as pool:
+        with Pool(processes=processes) as pool:
             start_date = datetime.now()
             pool.map(self.calculation, self.__params)
             print(datetime.now() - start_date)
