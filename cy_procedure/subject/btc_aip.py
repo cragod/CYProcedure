@@ -48,23 +48,24 @@ class OKexBTCAIP:
         self.trader_provicer = trader_provider
         self.recorder = recorder
         self.coin_pair = coin_pair
-        self.recorder.append_summary_log('定投 - BTC')
+        self.recorder.append_summary_log('##### **定投 - BTC**')
         # 直接从远往近抓
         self.configuration = ExchangeFetchingConfiguration(
             coin_pair, time_frame, 3, ExchangeFetchingType.FILL_RECENTLY, debug=debug)
         # 策略参数
-        self.day_of_week = day_of_week
+        self.day_of_week = datetime.today().weekday()
         self.ma_periods = ma_periods
+        self.invest_day = day_of_week
         # 交易
         self.__invest_base_amount = invest_base_amount
 
     def run_task(self):
         self.__fetch_candle()
         invest_ratio = self.__calculate_signal()
-        if invest_ratio is not None and invest_ratio > 0:
+        if invest_ratio is not None and invest_ratio > 0 and self.invest_day == self.day_of_week:
             self.__place_invest_order(invest_ratio)
         else:
-            self.recorder.record_summary_log('无买入信号')
+            self.recorder.record_summary_log('**无买入信号**')
 
     def __fetch_candle(self):
         procedure = ExchangeFetchingProcedure(ExchangeFetcher(self.signal_provider),
@@ -93,10 +94,10 @@ class OKexBTCAIP:
         actual_ratio = signals['high_change'][self.__df.index[-1]]
         advance_ratio = signals['signal'][self.__df.index[-1]]
         close_price = signals['close'][self.__df.index[-1]]
-        msg = """日期: {} \n
-计算价格：{} \n
-市场信号：{} \n
-定投比例：{}
+        msg = """**日期**: {} \n
+**计算价格**: {} \n
+**市场信号**: {} \n
+**定投倍数**: {}
 """.format(date_string, round(close_price, 4), round(actual_ratio, 4), advance_ratio)
         self.recorder.append_summary_log(msg)
         return advance_ratio
@@ -104,21 +105,21 @@ class OKexBTCAIP:
     def __place_invest_order(self, ratio):
         # 实际定投数
         invest_amount = ratio * self.__invest_base_amount
-        self.recorder.append_summary_log('定投额({} * {})：{} {}'.format(self.__invest_base_amount,
-                                                                     ratio, invest_amount, self.coin_pair.base_coin.upper()))
+        self.recorder.append_summary_log('**定投额**({} * {}): {} {}'.format(self.__invest_base_amount,
+                                                                          ratio, invest_amount, self.coin_pair.base_coin.upper()))
         self.__invest_proccess(invest_amount)
 
     def __invest_proccess(self, invest_amount):
         # ybb->bb
         if not self.__transfer_amount(invest_amount, self.coin_pair.base_coin.lower(), 8, 1):
-            self.recorder.record_summary_log('划转{}失败'.format(self.coin_pair.base_coin.upper()))
+            self.recorder.record_summary_log('**划转{}失败**'.format(self.coin_pair.base_coin.upper()))
             return
         # balance
         balance = self.trader_provicer.ccxt_object_for_fetching.fetch_balance()
         usdt = balance['free']['USDT']
         # not enough
         if usdt < invest_amount:
-            self.recorder.record_summary_log('{}不足以定投'.format(self.coin_pair.base_coin.upper()))
+            self.recorder.record_summary_log('**{}不足以定投**'.format(self.coin_pair.base_coin.upper()))
         # place order
         logger = TraderLogger(self.trader_provicer.display_name, self.coin_pair.formatted(), 'Spot', self.recorder)
         order = Order(self.coin_pair, invest_amount, 0)
@@ -161,22 +162,22 @@ class OKexBTCAIP:
         response = executor.handle_long_order_request()
         if response is None:
             self.__transfer_amount(invest_amount, self.coin_pair.base_coin.lower(), 1, 8)
-            self.recorder.record_summary_log('下单失败')
+            self.recorder.record_summary_log('**下单失败**')
             return
         # order info
         price = response['average']
         cost = response['cost']
         buy_amount = response['filled']
-        msg = """下单价格：{} \n
-下单总价：{} \n
-买入数量：{}
+        msg = """**下单价格**: {} \n
+**下单总价**: {} \n
+**买入数量**: {}
 """.format(round(price, 6), round(cost, 6), round(buy_amount, 10))
         self.recorder.append_summary_log(msg)
         # bb->ybb
         if not self.__transfer_amount(buy_amount, self.coin_pair.trade_coin.lower(), 1, 8):
-            self.recorder.record_summary_log('划转{}失败'.format(self.coin_pair.trade_coin.upper()))
+            self.recorder.record_summary_log('**划转{}失败**'.format(self.coin_pair.trade_coin.upper()))
             return
-        self.recorder.record_summary_log('定投成功')
+        self.recorder.record_summary_log('**定投成功**')
 
     def __transfer_amount(self, amount, coin, from_type, to_type):
         """ybb和bb互转
