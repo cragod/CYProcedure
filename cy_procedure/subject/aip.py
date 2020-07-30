@@ -8,7 +8,7 @@ from cy_widgets.strategy.exchange.autobuy import *
 from cy_widgets.exchange.provider import ExchangeType
 
 
-class OKexBTCAIP:
+class OKexAIP:
 
     def __init__(self,
                  coin_pair: CoinPair,
@@ -48,7 +48,7 @@ class OKexBTCAIP:
         self.trader_provicer = trader_provider
         self.recorder = recorder
         self.coin_pair = coin_pair
-        self.recorder.append_summary_log('##### **定投 - BTC**')
+        self.recorder.append_summary_log('**{} - 定投**'.format(coin_pair.formatted().upper()))
         # 直接从远往近抓
         self.configuration = ExchangeFetchingConfiguration(
             coin_pair, time_frame, 3, ExchangeFetchingType.FILL_RECENTLY, debug=debug)
@@ -65,7 +65,7 @@ class OKexBTCAIP:
         if invest_ratio is not None and invest_ratio > 0 and self.invest_day == self.day_of_week:
             self.__place_invest_order(invest_ratio)
         else:
-            self.recorder.record_summary_log('**无买入信号**')
+            self.recorder.record_summary_log()
 
     def __fetch_candle(self):
         procedure = ExchangeFetchingProcedure(ExchangeFetcher(self.signal_provider),
