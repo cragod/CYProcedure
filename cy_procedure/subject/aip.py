@@ -9,6 +9,7 @@ from cy_widgets.exchange.provider import ExchangeType
 
 
 class OKexAIP:
+    """https://www.okex.com/docs/zh/#error-spot"""
 
     def __init__(self,
                  coin_pair: CoinPair,
@@ -19,7 +20,8 @@ class OKexAIP:
                  trader_provider,
                  invest_base_amount,
                  recorder: ProcedureRecorder,
-                 debug=False):
+                 debug=False,
+                 fee_percent=0.0015):
         """余币宝转出USDT + 定投买入 + 余币宝转入BTC
 
         Parameters
@@ -42,6 +44,8 @@ class OKexAIP:
             定投基准额
         recorder : ProcedureRecorder
             记录
+        fee_percent : Double
+            手续费
         """
         self.__df = pd.DataFrame()
         self.signal_provider = signal_provider
@@ -49,6 +53,7 @@ class OKexAIP:
         self.recorder = recorder
         self.coin_pair = coin_pair
         self.recorder.append_summary_log('**{} - 定投**'.format(coin_pair.formatted().upper()))
+        self.fee_percent = fee_percent
         # 直接从远往近抓
         self.configuration = ExchangeFetchingConfiguration(
             coin_pair, time_frame, 3, ExchangeFetchingType.FILL_RECENTLY, debug=debug)
@@ -167,15 +172,20 @@ class OKexAIP:
         # order info
         price = response['average']
         cost = response['cost']
-        buy_amount = response['filled']
+        buy_amount = round(response['filled'] * (1 - self.fee_percent), 8)
         msg = """**下单价格**: {} \n
 **下单总价**: {} \n
 **买入数量**: {}
-""".format(round(price, 6), round(cost, 6), round(buy_amount, 10))
+""".format(round(price, 6), round(cost, 6), round(buy_amount, 8))
         self.recorder.append_summary_log(msg)
-        # bb->ybb
+        # bb->ybb (InvestCoin)
         if not self.__transfer_amount(buy_amount, self.coin_pair.trade_coin.lower(), 1, 8):
             self.recorder.record_summary_log('**划转{}失败**'.format(self.coin_pair.trade_coin.upper()))
+            return
+        # bb->ybb (RemainingBaseCoin)
+        remaining_base_coin = round(invest_amount - cost, 6)  # 保留 6 位
+        if remaining_base_coin > 0 and not self.__transfer_amount(remaining_base_coin, self.coin_pair.base_coin.lower(), 1, 8):
+            self.recorder.record_summary_log('**划转{}失败**'.format(self.coin_pair.base_coin.upper()))
             return
         self.recorder.record_summary_log('**定投成功**')
 
@@ -193,14 +203,18 @@ class OKexAIP:
             1: bb 8: ybb
         """
         # ybb -> bb
-        response = self.trader_provicer.ccxt_object_for_order.account_post_transfer({
-            'currency': coin,
-            'amount': '{}'.format(amount),
-            'type': '0',
-            'from': '{}'.format(from_type),
-            'to': '{}'.format(to_type)
-        })
-        return response['result']
+        try:
+            response = self.trader_provicer.ccxt_object_for_order.account_post_transfer({
+                'currency': coin,
+                'amount': '{}'.format(amount),
+                'type': '0',
+                'from': '{}'.format(from_type),
+                'to': '{}'.format(to_type)
+            })
+            return response['result']
+        except Exception as e:
+            self.recorder.append_summary_log('{}.{}.划转失败.{}'.format(from_type, to_type, str(e)))
+            return False
 
     def __get_latest_date(self):
         if self.__df.shape[0] > 0:
