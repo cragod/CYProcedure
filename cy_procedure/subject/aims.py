@@ -100,6 +100,14 @@ class BinanceAIMS:
 
         self.__recorder.record_procedure("获取 K 线成功")
 
+    @property
+    def __position(self):
+        return AIMSPosition.position_with(self.__provider.display_name, self.__coin_pair.formatted())
+
+    @property
+    def __trader_logger(self):
+        return TraderLogger(self.__provider.display_name, self.__coin_pair.formatted(), 'Spot', self.__recorder)
+
     def calculate_signal(self):
         # Signal Calculation
         strategy = AutoInvestVarietalStrategy(signal_scale=self.__signal_scale,
@@ -119,22 +127,26 @@ class BinanceAIMS:
         else:
             position = self.__position
             open_price = self.__df.iloc[-1][COL_OPEN]
-            if position.hold > 0 and open_price / (position.cost / position.hold) > self.__sell_threshold:
+            # P/L
+            pol = open_price / (position.cost / position.hold) if position.hold > 0 else 0
+            if pol > self.__sell_threshold:
                 # 用数据库判断卖出，这里再取实际的仓位数
                 amount = self.__provider.ccxt_object_for_order.fetch_balance()['free'][self.__coin_pair.trade_coin]
                 # 卖出
                 self.handle_selling(amount)
             else:
                 # 无信号 结束
-                self.__recorder.record_summary_log('**信号**: 无 \n')
-
-    @property
-    def __position(self):
-        return AIMSPosition.position_with(self.__provider.display_name, self.__coin_pair.formatted())
-
-    @property
-    def __trader_logger(self):
-        return TraderLogger(self.__provider.display_name, self.__coin_pair.formatted(), 'Spot', self.__recorder)
+                self.__recorder.append_summary_log('**信号**: 无 \n')
+                if pol > 0:
+                    msg = """**持仓数量**: {} {} \n
+**仓位成本**: {} {} \n
+**仓位均价**: {} \n
+**P/L**: {}%
+""".format(round(position.hold, 8), self.__coin_pair.trade_coin.upper(),
+                        round(position.cost, 8), self.__coin_pair.base_coin.upper(),
+                        round((position.cost / position.hold) if position.hold > 0 else 0, 8), round(100*pol, 2))
+                    self.__recorder.append_summary_log(msg)
+                self.__recorder.record_summary_log()
 
     def handle_buying(self, amount):
         # 下单数量
@@ -219,11 +231,13 @@ class BinanceAIMS:
         price = response['average']
         cost = response['cost']
         filled = response['filled']
+        position = self.__position
         msg = """**成交价格**: {} \n
 **成交总价**: {} {}\n
-**成交数量**: {} {}
-""".format(round(price, 6), round(cost, 6), self.__coin_pair.base_coin.upper(), round(filled, 8), self.__coin_pair.trade_coin.upper())
+**成交数量**: {} {}\n
+**仓位成本**: {} {}
+""".format(round(price, 6), round(cost, 6), self.__coin_pair.base_coin.upper(), round(filled, 8), self.__coin_pair.trade_coin.upper(),
+           round(position.cost, 8), self.__coin_pair.base_coin.upper())
         # 更新 Cost/Hold 到数据库
-        position = self.__position
         position.reset()
         self.__recorder.record_summary_log(msg)
