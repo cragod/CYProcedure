@@ -22,6 +22,7 @@ class BinanceAIMS:
                  provider: CCXTProvider,
                  signal_scale,
                  ma_periods,
+                 sell_threshold,
                  invest_base_amount,
                  recorder: ProcedureRecorder,
                  fee_percent=0,  # 订单里已经扣了，这里不用手动算
@@ -41,13 +42,14 @@ class BinanceAIMS:
         # 策略参数
         self.__ma_periods = ma_periods
         self.__signal_scale = signal_scale
+        self.__sell_threshold = sell_threshold
         # 交易
         self.__invest_base_amount = invest_base_amount
 
     def run_task(self):
         try:
             while True:
-                self.__fetch_candle()
+                self.fetch_candle()
                 # 循环，直到最后一条数据是今天的
                 if self.__df.shape[0] > 0 and self.__df.iloc[-1][COL_CANDLE_BEGIN_TIME].dt.dayofweek == datetime.utcnow().dayofweek:
                     break
@@ -58,12 +60,12 @@ class BinanceAIMS:
         except Exception as e:
             self.__recorder.record_summary_log(str(e))
 
-    def __fetch_candle(self):
+    def fetch_candle(self):
         """ 获取 K 线 """
         def __get_latest_date():
             if self.__df.shape[0] > 0:
                 return self.__df[COL_CANDLE_BEGIN_TIME].iloc[-1]
-            return datetime.now() - timedelta(days=self.ma_periods + 15)  # 往前多加15天开始
+            return datetime.now() - timedelta(days=self.__ma_periods + 15)  # 往前多加15天开始
 
         def __save_df(data_df: pd.DataFrame):
             before_count = self.__df.shape[0]
@@ -93,10 +95,10 @@ class BinanceAIMS:
         # Fill to Latest
         procedure.run_task()
 
-        if self.configuration.debug:
+        if self.__configuration.debug:
             print(self.__df)
 
-        self.recorder.record_procedure("获取 K 线成功")
+        self.__recorder.record_procedure("获取 K 线成功")
 
     def __calculate_signal(self):
         # Signal Calculation
@@ -108,26 +110,38 @@ class BinanceAIMS:
             print(signals[-200:])
         return signals.iloc[-1][COL_SIGNAL]
 
-    def __handle_signal(self, signal):
+    def handle_signal(self, signal):
         """处理信号"""
         if signal > 0:
             self.__recorder.append_summary_log('**信号**: 买入({}) \n'.format(signal))
             # 买入
-            self.__handle_signal(signal * self.__invest_base_amount)
+            self.handle_buying(signal * self.__invest_base_amount)
         else:
-            # 卖出
-            if self.__handle_selling():
-                return
-            # 无信号
-            self.__recorder.append_summary_log('**信号**: 无 \n')
+            position = self.__position
+            open_price = self.__df.iloc[-1][COL_OPEN]
+            if position.hold > 0 and open_price / (position.cost / position.hold) > self.__sell_threshold:
+                # 用数据库判断卖出，这里再取实际的仓位数
+                amount = self.__provider.ccxt_object_for_order.fetch_balance()['free'][self.__coin_pair.trade_coin]
+                # 卖出
+                self.handle_selling(amount)
+            else:
+                # 无信号
+                self.__recorder.append_summary_log('**信号**: 无 \n')
+
+    @property
+    def __position(self):
+        return AIMSPosition.position_with(self.__provider.display_name, self.__coin_pair.formatted())
+
+    @property
+    def __trader_logger(self):
+        return TraderLogger(self.__provider.display_name, self.__coin_pair.formatted(), 'Spot', self.__recorder)
 
     def handle_buying(self, amount):
         # 下单数量
         self.__recorder.append_summary_log('**下单数量**: {} {}\n'.format(amount, self.__coin_pair.base_coin.upper()))
         # ers
-        logger = TraderLogger(self.__provider.display_name, self.__coin_pair.formatted(), 'Spot', self.__recorder)
-        order = Order(self.__coin_pair, amount, 0)
-        executor = ExchangeOrderExecutorFactory.executor(self.__provider, order, logger)
+        order = Order(self.__coin_pair, amount, 0)  # Only set base coin amount
+        executor = ExchangeOrderExecutorFactory.executor(self.__provider, order, self.__trader_logger)
         # place order
         response = executor.handle_long_order_request()
         if response is None:
@@ -137,21 +151,8 @@ class BinanceAIMS:
         price = response['average']
         cost = response['cost']
         filled = response['filled']
-        # TODO: Binance 手续费怎么算还不知道
-        # {'info': {'symbol': 'BNBUSDT',
-        # 'orderId': 701037299,
-        # 'orderListId': -1,
-        # 'clientOrderId': 'Se8IFlpHyWpsY7OaYkhKC1',
-        # 'transactTime': 1597589153872,
-        # 'price': '23.32360000',
-        # 'origQty': '0.47000000',
-        # 'executedQty': '0.47000000',
-        # 'cummulativeQuoteQty': '10.85431900',
-        # 'status': 'FILLED',
-        # 'timeInForce': 'GTC',
-        # 'type': 'LIMIT',
-        # 'side': 'BUY'},
-        # 'id': '701037299',
+        # Binance 手续费已经扣掉了
+        # {'id': '701037299',
         # 'clientOrderId': 'Se8IFlpHyWpsY7OaYkhKC1',
         # 'timestamp': 1597589153872,
         # 'datetime': '2020-08-16T14:45:53.872Z',
@@ -171,18 +172,58 @@ class BinanceAIMS:
         buy_amount = math.floor(filled * (1 - self.__fee_percent) * 1e8) / 1e8  # *1e8 向下取整再 / 1e8
         msg = """**下单价格**: {} \n
 **下单总价**: {} {}\n
-**买入数量**: {} {}\n
+**买入数量**: {} {}
 """.format(round(price, 6), round(cost, 6), self.__coin_pair.base_coin.upper(), round(buy_amount, 8), self.__coin_pair.trade_coin.upper())
         self.__recorder.append_summary_log(msg)
         # 更新 Cost/Hold 到数据库
-        position = AIMSPosition.position_with(self.__provider.display_name, self.__coin_pair.formatted())
+        position = self.__position
         position.update(cost, buy_amount)
         msg = """**持仓数量**: {} {} \n
 **仓位成本**: {} {} \n
-**仓位均价**: {}\n
+**仓位均价**: {}
 """.format(round(position.hold, 8), self.__coin_pair.trade_coin.upper(),
            round(position.cost, 8), self.__coin_pair.base_coin.upper(),
            round((position.cost / position.hold) if position.hold > 0 else 0, 8))
+        self.__recorder.record_summary_log(msg)
 
-    def __handle_selling(self) -> bool:
-        pass
+    def handle_selling(self, amount):
+        # 下单数量
+        self.__recorder.append_summary_log('**信号**: 卖出 \n')
+        self.__recorder.append_summary_log('**下单数量**: {} {}\n'.format(amount, self.__coin_pair.trade_coin.upper()))
+        # ers
+        order = Order(self.__coin_pair, 0, amount, side=OrderSide.SELL)  # Only set trade coin amount
+        executor = ExchangeOrderExecutorFactory.executor(self.__provider, order, self.__trader_logger)
+        # place order
+        response = executor.handle_close_order_request()
+        if response is None:
+            self.__recorder.record_summary_log('**下单失败**')
+            return
+        # handle order
+        # 'id': '701205190',
+        # 'clientOrderId': 'Iep2bjMRJGSUBS0qDq9AhS',
+        # 'timestamp': 1597595099771,
+        # 'datetime': '2020-08-16T16:24:59.771Z',
+        # 'lastTradeTimestamp': None,
+        # 'symbol': 'BNB/USDT',
+        # 'type': 'limit',
+        # 'side': 'sell',
+        # 'price': 22.979,
+        # 'amount': 0.92,
+        # 'cost': 21.355224,
+        # 'average': 23.2122,
+        # 'filled': 0.92,
+        # 'remaining': 0.0,
+        # 'status': 'closed',
+        # 'fee': None,
+        # 'trades': None}
+        price = response['average']
+        cost = response['cost']
+        filled = response['filled']
+        msg = """**成交价格**: {} \n
+**成交总价**: {} {}\n
+**成交数量**: {} {}
+""".format(round(price, 6), round(cost, 6), self.__coin_pair.base_coin.upper(), round(filled, 8), self.__coin_pair.trade_coin.upper())
+        # 更新 Cost/Hold 到数据库
+        position = self.__position
+        position.reset()
+        self.__recorder.record_summary_log(msg)
