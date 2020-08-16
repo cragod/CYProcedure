@@ -51,12 +51,12 @@ class BinanceAIMS:
             while True:
                 self.fetch_candle()
                 # 循环，直到最后一条数据是今天的
-                if self.__df.shape[0] > 0 and self.__df.iloc[-1][COL_CANDLE_BEGIN_TIME].dt.dayofweek == datetime.utcnow().dayofweek:
+                if self.__df.shape[0] > 0 and self.__df.iloc[-1][COL_CANDLE_BEGIN_TIME].dayofweek == datetime.utcnow().weekday():
                     break
                 self.__recorder.record_exception("未抓取到今天的 K 线，稍后重试")
                 time.sleep(3)
-            invest_ratio = self.__calculate_signal()
-            self.__handle_signal(invest_ratio)
+            invest_ratio = self.calculate_signal()
+            self.handle_signal(invest_ratio)
         except Exception as e:
             self.__recorder.record_summary_log(str(e))
 
@@ -100,13 +100,13 @@ class BinanceAIMS:
 
         self.__recorder.record_procedure("获取 K 线成功")
 
-    def __calculate_signal(self):
+    def calculate_signal(self):
         # Signal Calculation
         strategy = AutoInvestVarietalStrategy(signal_scale=self.__signal_scale,
                                               ma_periods=self.__ma_periods)
         signals = strategy.calculate_signals(self.__df, False)
         # Debug 下打印一点信号看看
-        if self.configuration.debug:
+        if self.__configuration.debug:
             print(signals[-200:])
         return signals.iloc[-1][COL_SIGNAL]
 
@@ -125,8 +125,8 @@ class BinanceAIMS:
                 # 卖出
                 self.handle_selling(amount)
             else:
-                # 无信号
-                self.__recorder.append_summary_log('**信号**: 无 \n')
+                # 无信号 结束
+                self.__recorder.record_summary_log('**信号**: 无 \n')
 
     @property
     def __position(self):
@@ -170,9 +170,9 @@ class BinanceAIMS:
         # 'fee': None,
         # 'trades': None}
         buy_amount = math.floor(filled * (1 - self.__fee_percent) * 1e8) / 1e8  # *1e8 向下取整再 / 1e8
-        msg = """**下单价格**: {} \n
-**下单总价**: {} {}\n
-**买入数量**: {} {}
+        msg = """**成交价格**: {} \n
+**成交总价**: {} {}\n
+**成交数量**: {} {}
 """.format(round(price, 6), round(cost, 6), self.__coin_pair.base_coin.upper(), round(buy_amount, 8), self.__coin_pair.trade_coin.upper())
         self.__recorder.append_summary_log(msg)
         # 更新 Cost/Hold 到数据库
