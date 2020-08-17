@@ -32,3 +32,4 @@ class ProcedureRecorder(RecorderBase):
         if content is not None:
             self.append_summary_log(content)
         MessageHandler.send_message(self.__summary_log, 'Procedure Summary', self.__message_type, self.__message_token)
+        self.__summary_log = ""

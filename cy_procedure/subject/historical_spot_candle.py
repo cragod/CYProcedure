@@ -55,7 +55,7 @@ class CSVHistoricalSpotCandle:
             self.__df = self.__df[(self.__df[COL_CANDLE_BEGIN_TIME] >= self.start_date)
                                   & (self.__df[COL_CANDLE_BEGIN_TIME] <= self.end_date)]
             # self.__df.set_index(COL_CANDLE_BEGIN_TIME, inplace=True)
-            self.__df.reset_index(inplace=True)
+            self.__df.reset_index(inplace=True, drop=True)
             # print(self.__df)
             if self.save_path is not None:
                 self.__save_df_to_csv()
