@@ -238,6 +238,13 @@ class BinanceAIMS:
 **仓位成本**: {} {}
 """.format(round(price, 6), round(cost, 6), self.__coin_pair.base_coin.upper(), round(filled, 8), self.__coin_pair.trade_coin.upper(),
            round(position.cost, 8), self.__coin_pair.base_coin.upper())
+        # 更新卖出记录
+        close_pos = AIMSPositionSelling.with_aims_position(position)
+        close_pos.close_price = price
+        close_pos.profit_amount = cost - position.cost
+        close_pos.date = datetime.now()
+        close_pos.save()
         # 更新 Cost/Hold 到数据库
         position.reset()
+        # 通知
         self.__recorder.record_summary_log(msg)
