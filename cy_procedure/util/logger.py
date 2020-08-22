@@ -48,6 +48,7 @@ class PersistenceRecorder(RecorderBase):
         info = LogInfo()
         info.log = self._summary_log
         info.log_type = self.__log_type
+        info.create = datetime.now()
         try:
             info.save()
         except Exception:
