@@ -54,9 +54,7 @@ class CSVHistoricalSpotCandle:
         if stop:
             self.__df = self.__df[(self.__df[COL_CANDLE_BEGIN_TIME] >= self.start_date)
                                   & (self.__df[COL_CANDLE_BEGIN_TIME] <= self.end_date)]
-            # self.__df.set_index(COL_CANDLE_BEGIN_TIME, inplace=True)
             self.__df.reset_index(inplace=True, drop=True)
-            # print(self.__df)
             if self.save_path is not None:
                 self.__save_df_to_csv()
         return not stop
@@ -67,7 +65,7 @@ class CSVHistoricalSpotCandle:
         if not os.path.exists(path):
             os.makedirs(path, exist_ok=True)
         path = "{}/{}-{}.csv".format(path, self.config.coin_pair.formatted('-'), self.config.time_frame.value.upper())
-        self.__df.to_csv(path)
+        self.__df.to_csv(path, index=False)
 
 
 class DBHistoricalSpotCandle:
@@ -91,6 +89,7 @@ class DBHistoricalSpotCandle:
         ExchangeFetchingProcedure(self.fetcher, self.config, None, self.__get_latest_date, self.__save_df).run_task()
 
     def __get_latest_date(self):
+        print("lastest date: {}".format(self.start_date))
         return self.start_date
 
     def __save_df(self, df: pd.DataFrame):
