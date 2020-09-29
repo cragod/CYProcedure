@@ -7,6 +7,7 @@ from cy_widgets.trader.exchange_trader import *
 from cy_widgets.logger.trading import *
 from cy_widgets.strategy.exchange.autobuy import *
 from cy_widgets.exchange.provider import ExchangeType
+from cy_data_access.models.position import *
 
 
 class OKexAIP:
@@ -178,6 +179,15 @@ class OKexAIP:
 **下单总价**: {} \n
 **买入数量**: {}
 """.format(round(price, 6), round(cost, 6), round(buy_amount, 8))
+        # database record
+        record = AIPRecord()
+        record.exchange = 'OKEx'
+        record.coin_pair = self.coin_pair.formatted().upper()
+        record.cost = cost
+        record.amount = buy_amount
+        record.date = datetime.now()
+        record.save()
+        # log
         self.recorder.append_summary_log(msg)
         # bb->ybb (RemainingBaseCoin)
         remaining_base_coin = round(invest_amount - cost, 6)  # 保留 6 位
