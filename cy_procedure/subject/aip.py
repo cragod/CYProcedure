@@ -215,6 +215,20 @@ class OKexAIP:
         """
         # ybb -> bb
         try:
+
+            # transfer_to = to_type
+            # if from_type == 8:
+            #     # 先从余币宝转到资金
+            #     self.trader_provicer.ccxt_object_for_order.__post_api_account_v3_purchase_redempt({
+            #         'currency': coin,
+            #         'amount': '{}'.format(amount),
+            #         'side': 'redempt'
+            #     })
+            #     from_type = 6  # 再从资金账户转出到币币
+            # elif to_type == 8:
+            #     transfer_to = 6  # 要先转到资金
+            from_type = 6 if from_type == 8 else from_type
+            to_type = 6 if to_type == 8 else to_type
             response = self.trader_provicer.ccxt_object_for_order.account_post_transfer({
                 'currency': coin,
                 'amount': '{}'.format(amount),
@@ -222,6 +236,12 @@ class OKexAIP:
                 'from': '{}'.format(from_type),
                 'to': '{}'.format(to_type)
             })
+            # if to_type == 8:
+            #     self.trader_provicer.ccxt_object_for_order.__post_api_account_v3_purchase_redempt({
+            #         'currency': coin,
+            #         'amount': '{}'.format(amount),
+            #         'side': 'purchase'
+            #     })
             return response['result']
         except Exception as e:
             self.recorder.append_summary_log('{}.{}.划转失败.{}'.format(from_type, to_type, str(e)))
