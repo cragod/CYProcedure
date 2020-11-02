@@ -49,7 +49,6 @@ class BinanceAIP(AIPBase):
         except Exception:
             self.recorder.record_summary_log('**回滚划转{}失败**'.format(self.coin_pair.base_coin.upper()))
 
-    @abstractmethod
     def _finishing_aip(self, remaining_base_coin_amount, order_amount):
         """完成定投后的收尾工作"""
         try:
