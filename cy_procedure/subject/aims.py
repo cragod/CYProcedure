@@ -46,7 +46,7 @@ class BinanceAIMS:
         # 交易
         self.__invest_base_amount = invest_base_amount
 
-    def run_task(self):
+    def run_task(self, retry_time=3):
         try:
             while True:
                 self.fetch_candle()
@@ -58,7 +58,13 @@ class BinanceAIMS:
             invest_ratio = self.calculate_signal()
             self.handle_signal(invest_ratio)
         except Exception as e:
-            self.__recorder.record_summary_log(str(e))
+            self.__recorder.append_summary_log(str(e))
+            if retry_time > 0:
+                self.__recorder.append_summary_log('获取 K 线失败，3 秒后重试')
+                time.sleep(3)
+                self.run_task(retry_time=retry_time - 1)
+            else:
+                self.__recorder.record_summary_log('获取 K 线失败，不重试了，跳过')
 
     def fetch_candle(self):
         """ 获取 K 线 """
