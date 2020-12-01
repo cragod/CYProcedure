@@ -1,4 +1,5 @@
 import math
+from datetime import datetime
 from cy_widgets.exchange.provider import *
 from cy_widgets.trader.exchange_trader import *
 
@@ -12,6 +13,7 @@ class BinanceHandler:
 
     def fetch_all_lending_product(self):
         """所有活期产品"""
+
         # https://binance-docs.github.io/apidocs/spot/cn/#baa37cb2f9
         # [{
         #    "asset": "BTC",
@@ -28,12 +30,24 @@ class BinanceHandler:
         #    "upLimitPerUser": "5.00000000"
         # }, {...}]
         self.__lending_products = self.__ccxt_provider.ccxt_object_for_query.sapi_get_lending_daily_product_list()
+        return self.__lending_products
 
     def daily_lending_product(self, coin_name):
         """查找对应币种的活期产品"""
         if self.__lending_products is None:
             self.fetch_all_lending_product()
         return list(filter(lambda x: x['asset'].lower() == coin_name.lower(), self.__lending_products))
+
+    def lending_interest_history(self, begin_time, end_time, asset):
+        """查询利息"""
+        parameters = {
+            "lendingType": "DAILY",
+            "startTime": begin_time,
+            "endTime": end_time,
+            "asset": asset,
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        }
+        return self.__ccxt_provider.ccxt_object_for_query.sapiGetLendingUnionInterestHistory(parameters)
 
     def fetch_balance(self, type="spot"):
         """查询余额

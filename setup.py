@@ -36,7 +36,7 @@ setup(
     description="Procedures based on components/widgets/dao",
     entry_points={
         'console_scripts': [
-            'cy_procedure=cy_procedure.cli:main',
+            'cy_binance_interest=cy_procedure.cli:binance_interest',
         ],
     },
     install_requires=requirements,
