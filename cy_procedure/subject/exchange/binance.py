@@ -36,7 +36,25 @@ class BinanceHandler:
         """查找对应币种的活期产品"""
         if self.__lending_products is None:
             self.fetch_all_lending_product()
-        return list(filter(lambda x: x['asset'].lower() == coin_name.lower(), self.__lending_products))
+        filtered = list(filter(lambda x: x['asset'].lower() == coin_name.lower(), self.__lending_products))
+        return filtered[0] if filtered else None
+
+    def purchase_daily_lending_product(self, product_id, amount):
+        """购买活期"""
+        return self.__ccxt_provider.ccxt_object_for_query.sapi_post_lending_daily_purchase({
+            "productId": product_id,
+            "amount": amount,
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        })
+
+    def redeem_daily_lending_product(self, product_id, amount):
+        """赎回活期"""
+        return self.__ccxt_provider.ccxt_object_for_query.sapi_post_lending_daily_redeem({
+            "productId": product_id,
+            "amount": amount,
+            "timestamp": int(datetime.now().timestamp() * 1000),
+            'type': 'FAST'
+        })
 
     def lending_interest_history(self, begin_time, end_time, asset):
         """查询利息"""
