@@ -56,6 +56,13 @@ class BinanceHandler:
             'type': 'FAST'
         })
 
+    def fetch_daily_lending_holding(self, asset):
+        """查询活期持仓"""
+        return self.__ccxt_provider.ccxt_object_for_query.sapi_get_lending_daily_token_position({
+            "asset": asset,
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        })
+
     def lending_interest_history(self, begin_time, end_time, asset):
         """查询利息"""
         parameters = {
