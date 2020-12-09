@@ -74,6 +74,10 @@ class OKexAIP:
         else:
             self.recorder.record_summary_log()
 
+    @staticmethod
+    def round_floor(value, digit):
+        return float(math.floor(value * digit)) / digit
+
     def __fetch_candle(self):
         procedure = ExchangeFetchingProcedure(ExchangeFetcher(self.signal_provider),
                                               self.configuration,
@@ -190,13 +194,15 @@ class OKexAIP:
         # log
         self.recorder.append_summary_log(msg)
         # bb->ybb (RemainingBaseCoin)
-        remaining_base_coin = round(invest_amount - cost, 6)  # 保留 6 位
+        remaining_base_coin = OKexAIP.round_floor(invest_amount - cost, 1e6)  # 保留 6 位
         if remaining_base_coin > 0 and not self.__transfer_amount(remaining_base_coin, self.coin_pair.base_coin.lower(), 1, 8):
-            self.recorder.record_summary_log('**划转{}失败**'.format(self.coin_pair.base_coin.upper()))
+            self.recorder.record_summary_log(
+                '**划转{}{}失败**'.format(remaining_base_coin, self.coin_pair.base_coin.upper()))
             return
         # bb->ybb (InvestCoin)
         if not self.__transfer_amount(buy_amount, self.coin_pair.trade_coin.lower(), 1, 8):
-            self.recorder.record_summary_log('**划转{}失败**:{}'.format(self.coin_pair.trade_coin.upper(), order))
+            self.recorder.record_summary_log('**划转{}{}失败**:{}'.format(buy_amount,
+                                                                      self.coin_pair.trade_coin.upper(), order))
             return
         self.recorder.record_summary_log('**定投成功**')
 
