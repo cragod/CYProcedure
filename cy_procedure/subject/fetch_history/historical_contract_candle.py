@@ -1,29 +1,28 @@
-import os
+import pandas as pd
 from datetime import datetime
-from cy_components.helpers.formatter import CandleFormatter
+from cy_components.defines.column_names import *
 from cy_data_access.models.market import *
 from cy_data_access.util.convert import convert_df_to_json_list
-from ..generic.spot_fetching import *
+from ...generic.contract_fetching import *
 
 
-class CSVHistoricalSpotCandle:
-    def __init__(self, coin_pair, time_frame, exchange_type, start_date='2020-03-03 00:00:00', end_date=None, save_path=None, per_limit=1000):
+class CSVHistoricalContractCandle:
+    def __init__(self, coin_pair, time_frame, exchange_type, contract_type, start_date='2020-03-03 00:00:00', end_date=None, persistence_df=None):
         self.__df = pd.DataFrame()
-        self.save_path = save_path
+        self.__persistence_df = persistence_df
         # 时间区间
         self.start_date = DateFormatter.convert_string_to_local_date(start_date).astimezone()
         self.end_date = DateFormatter.convert_string_to_local_date(end_date) if end_date is not None else datetime.now()
         self.end_date = self.end_date.astimezone()
         # 抓取使用的配置
         self.provider = CCXTProvider("", "", exchange_type)
-        self.config = ExchangeFetchingConfiguration(
-            coin_pair, time_frame, 1, ExchangeFetchingType.FILL_RECENTLY, batch_limit=per_limit)
-        self.fetcher = ExchangeFetcher(self.provider)
+        self.config = ContractFetchingConfiguration(
+            coin_pair, time_frame, 1, ContractFetchingType.FILL_RECENTLY, contract_type)
+        self.fetcher = BaseContractFetcher.dispatched_fetcher(self.provider)
 
     def run_task(self):
         # 开始抓取
-        ExchangeFetchingProcedure(self.fetcher, self.config, None, self.__get_latest_date, self.__save_df).run_task()
-        return self.__df
+        ContractFetchingProcedure(self.fetcher, self.config, None, self.__get_latest_date, self.__save_df).run_task()
 
     def __get_latest_date(self):
         if self.__df.shape[0] > 0:
@@ -54,42 +53,33 @@ class CSVHistoricalSpotCandle:
         if stop:
             self.__df = self.__df[(self.__df[COL_CANDLE_BEGIN_TIME] >= self.start_date)
                                   & (self.__df[COL_CANDLE_BEGIN_TIME] <= self.end_date)]
-            self.__df.reset_index(inplace=True, drop=True)
-            if self.save_path is not None:
-                self.__save_df_to_csv()
+            self.__df.set_index(COL_CANDLE_BEGIN_TIME, inplace=True)
+            print(self.__df)
+            if self.__persistence_df is not None:
+                self.__persistence_df(self.__df)
         return not stop
 
-    def __save_df_to_csv(self):
-        path = "{}/{}".format(self.save_path, self.provider.ccxt_object_for_fetching.id)
-        os.path.join(path)
-        if not os.path.exists(path):
-            os.makedirs(path, exist_ok=True)
-        path = "{}/{}-{}.csv".format(path, self.config.coin_pair.formatted('-'), self.config.time_frame.value.upper())
-        self.__df.to_csv(path, index=False)
 
-
-class DBHistoricalSpotCandle:
-    """外部连接数据库，内部只负责写入"""
-
-    def __init__(self, coin_pair, time_frame, exchange_type, start_date='2020-03-03 00:00:00', end_date=None, per_limit=1000):
+class DBHistoricalContractCandle:
+    def __init__(self, coin_pair, time_frame, exchange_type, contract_type, start_date='2020-03-03 00:00:00', end_date=None, per_limit=1000):
         # 时间区间
         self.start_date = DateFormatter.convert_string_to_local_date(start_date).astimezone()
         self.end_date = DateFormatter.convert_string_to_local_date(end_date) if end_date is not None else datetime.now()
         self.end_date = self.end_date.astimezone()
         # 抓取使用的配置
         self.provider = CCXTProvider("", "", exchange_type)
-        self.config = ExchangeFetchingConfiguration(
-            coin_pair, time_frame, 1, ExchangeFetchingType.FILL_RECENTLY, batch_limit=per_limit)
-        self.fetcher = ExchangeFetcher(self.provider)
+        self.config = ContractFetchingConfiguration(
+            coin_pair, time_frame, 1, ContractFetchingType.FILL_RECENTLY, contract_type, per_limit=per_limit)
+        self.fetcher = BaseContractFetcher.dispatched_fetcher(self.provider)
         # table name
         self.candle_cls = candle_record_class_with_components(self.provider.display_name, coin_pair, time_frame)
 
     def run_task(self):
         # 开始抓取
-        ExchangeFetchingProcedure(self.fetcher, self.config, None, self.__get_latest_date, self.__save_df).run_task()
+        ContractFetchingProcedure(self.fetcher, self.config, None,
+                                  self.__get_latest_date, self.__save_df).run_task()
 
     def __get_latest_date(self):
-        print("lastest date: {}".format(self.start_date))
         return self.start_date
 
     def __save_df(self, df: pd.DataFrame):
