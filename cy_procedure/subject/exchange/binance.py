@@ -70,6 +70,7 @@ class BinanceHandler:
             "startTime": begin_time,
             "endTime": end_time,
             "asset": asset,
+            "size": 100,
             "timestamp": int(datetime.now().timestamp() * 1000)
         }
         return self.__ccxt_provider.ccxt_object_for_query.sapiGetLendingUnionInterestHistory(parameters)
