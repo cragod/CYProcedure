@@ -8,7 +8,7 @@ from .subject.exchange.binance import *
 
 
 @c.command()
-@c.option('--begin', type=str, prompt="Begin date (e.g. 20201122)", required=True)
+@c.option('--begin', type=str, prompt="Begin date (e.g. 20201122)", default='20201122', required=True)
 @c.option('--end', type=str, prompt="End date (e.g. 20201122)", default='20301022', required=False)
 @c.option('--asset', type=str, prompt=True, required=True, default='USDT')
 def binance_interest(begin, end, asset):
