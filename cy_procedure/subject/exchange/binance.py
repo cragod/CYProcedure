@@ -64,7 +64,7 @@ class BinanceHandler:
         })
 
     def lending_interest_history(self, begin_time, end_time, asset):
-        """查询利息"""
+        """查询活期利息"""
         parameters = {
             "lendingType": "DAILY",
             "startTime": begin_time,
@@ -74,6 +74,10 @@ class BinanceHandler:
             "timestamp": int(datetime.now().timestamp() * 1000)
         }
         return self.__ccxt_provider.ccxt_object_for_query.sapiGetLendingUnionInterestHistory(parameters)
+
+    def all_premium(self, parameters={}):
+        """所有合约溢价信息"""
+        return self.__ccxt_provider.ccxt_object_for_query.dapiPublicGetPremiumIndex(parameters)
 
     def fetch_balance(self, type="spot"):
         """查询余额
