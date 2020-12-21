@@ -18,8 +18,10 @@ class CandleRealtimeCrawler:
 
     __config_reader: CrawlerConfigReader
 
-    def __init__(self, config_reader):
+    def __init__(self, config_reader, limit=10, duration=1):
         self.__config_reader = config_reader
+        self.__limit = limit
+        self.__duration = duration  # 两次间隔
 
     def __get_configs(self):
         """获取需要抓取的K线配置"""
@@ -32,10 +34,13 @@ class CandleRealtimeCrawler:
         coin_pair = config.coin_pair
         while True:
             try:
-                if (start_time.replace(second=0) + timedelta(minutes=1) - datetime.now().astimezone(tz=pytz.utc)).seconds < 15:
+                if (start_time.replace(second=0) + timedelta(minutes=self.__duration) - datetime.now().astimezone(tz=pytz.utc)).seconds < 15:
                     print('{} {} 马上到下一个周期了，不试了'.format(config.coin_pair.formatted(), config.time_frame.value))
                     return
-                df = ExchangeFetcher(self.__config_reader.ccxt_provider).fetch_historical_candle_data_by_end_date(coin_pair, time_frame, datetime.now(), 10)
+                df = ExchangeFetcher(self.__config_reader.ccxt_provider).fetch_historical_candle_data_by_end_date(coin_pair,
+                                                                                                                  time_frame,
+                                                                                                                  datetime.now(),
+                                                                                                                  self.__limit)
                 # 空的
                 if df.empty:
                     continue
@@ -72,9 +77,10 @@ class CandleRealtimeCrawler:
         configs = self.__get_configs()
         self.__dispatch_task(configs)
         while True:
-            # 等待到下一分钟
+            # 等待到下一次
             current_time = datetime.now().astimezone(tz=pytz.utc)
-            next_time = current_time.replace(second=0) + timedelta(minutes=1)
+            next_time = current_time.replace(second=0) + timedelta(minutes=self.__duration)
+            print('下次', self.__config_reader.name, next_time)
             time.sleep(max(0, (next_time - current_time).seconds))
             while True:  # 在靠近目标时间时
                 if datetime.now().astimezone(tz=pytz.utc) > next_time:
