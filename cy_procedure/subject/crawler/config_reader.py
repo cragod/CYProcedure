@@ -14,9 +14,6 @@ class CrawlerItemConfig:
 class CrawlerConfigReader(ABC):
     """配置读取基类"""
 
-    def __init__(self, is_full):
-        self.__is_full = is_full
-
     @abstractproperty
     def name(self):
         return ""
@@ -44,8 +41,8 @@ class CrawlerConfigReader(ABC):
 class BinanceDeliveryCrawlerConfigReader(CrawlerConfigReader):
     """币安合约"""
 
-    def __init__(self, is_full):
-        super().__init__(is_full)
+    def __init__(self):
+        super().__init__()
         self.__provider = CCXTProvider("", "", ExchangeType.Binance, {
             'defaultType': 'delivery'
         })
@@ -57,6 +54,26 @@ class BinanceDeliveryCrawlerConfigReader(CrawlerConfigReader):
     @property
     def configs(self):
         return self._fetch_configs(CrawlerType.BNC_DELIVERY)
+
+    @property
+    def ccxt_provider(self):
+        return self.__provider
+
+
+class OKExContractCrawlerConfigReader(CrawlerConfigReader):
+    """OK合约"""
+
+    def __init__(self):
+        super().__init__()
+        self.__provider = CCXTProvider("", "", ExchangeType.Okex)
+
+    @property
+    def name(self):
+        return "OKEx.Contract"
+
+    @property
+    def configs(self):
+        return self._fetch_configs(CrawlerType.OK_CONTRACT)
 
     @property
     def ccxt_provider(self):
