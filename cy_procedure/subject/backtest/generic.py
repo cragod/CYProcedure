@@ -59,9 +59,6 @@ class GenericBacktestProcedure:
                                             param_identifier=param_identifier,
                                             equity_curve=evaluated_res.get('累积净值', 0),
                                             statics_info=evaluated_res)
-                json_list = convert_df_to_json_list(position_df, COL_CANDLE_BEGIN_TIME)
-                # 保存信号表
-                backtest_signal_candle_class(overview.signal_collection_name()).bulk_upsert_records(json_list)
                 # 保存总览数据
                 overview.save()
                 self.unified_exit_handler(True)
@@ -73,7 +70,7 @@ class GenericBacktestProcedure:
         """单次回测开始"""
         try:
             strategy = self.__strategy_cls(**param)
-            param_str = "|".join(["{}:{}".format(key, param[key]) for key in sorted(param.keys())])
+            param_str = ";".join(["{}:{}".format(key, param[key]) for key in sorted(param.keys())])
             start_date = dfr.convert_local_date_to_string(self.__df.iloc[0][COL_CANDLE_BEGIN_TIME], "%Y%m%d")
             end_date = dfr.convert_local_date_to_string(self.__df.iloc[-1][COL_CANDLE_BEGIN_TIME], "%Y%m%d")
             param_identifier = "{}|{}|{}|{}".format(strategy.name, param_str, self.__time_frame, "{},{}".format(start_date, end_date))
