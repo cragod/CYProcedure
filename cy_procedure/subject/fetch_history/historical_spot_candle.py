@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime
 from cy_components.helpers.formatter import CandleFormatter
 from cy_data_access.models.market import *
@@ -84,9 +85,16 @@ class DBHistoricalSpotCandle:
         # table name
         self.candle_cls = candle_record_class_with_components(self.provider.display_name, coin_pair, time_frame)
 
-    def run_task(self):
+    def run_task(self, retry=10):
         # 开始抓取
-        ExchangeFetchingProcedure(self.fetcher, self.config, None, self.__get_latest_date, self.__save_df).run_task()
+        try:
+            procedure = ExchangeFetchingProcedure(self.fetcher, self.config, None, self.__get_latest_date, self.__save_df)
+            procedure.run_task()
+        except Exception as e:
+            print("Fetche Failed", e)
+            if retry > 0:
+                time.sleep(3)
+                self.run_task(retry - 1)
 
     def __get_latest_date(self):
         print("lastest date: {}".format(self.start_date))
