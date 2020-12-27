@@ -19,9 +19,22 @@ def cyok(ctx, db_user, db_pwd, db_host):
     ctx.obj['db_h'] = db_host
 
 
+def get_rates(instr_id, ok_handler):
+    try:
+        info = ok_handler.fetch_swap_instrument_fund_rate(instr_id)
+        return "{}: \t上次: {}% \t下次: {}%".format(
+            instr_id,
+            round(float(info['funding_rate']) * 100, 2),
+            round(float(info['estimated_rate']) * 100, 2),
+        )
+    except Exception as e:
+        return "{} Failed".format(instr_id)
+
+
 @cyok.command()
 @c.pass_context
 def instruments_fund_rates(cxt):
+    """资金费率"""
     # ccxt
     provider = CCXTProvider("", "", ExchangeType.Okex)
     ok_handler = OKExHandler(provider)
@@ -40,13 +53,13 @@ def instruments_fund_rates(cxt):
         print(s)
 
 
-def get_rates(instr_id, ok_handler):
-    try:
-        info = ok_handler.fetch_swap_instrument_fund_rate(instr_id)
-        return "{}: \t上次: {}% \t下次: {}%".format(
-            instr_id,
-            round(float(info['funding_rate']) * 100, 2),
-            round(float(info['estimated_rate']) * 100, 2),
-        )
-    except Exception as e:
-        return "{} Failed".format(instr_id)
+@cyok.command()
+@c.option('-f', required=False)
+@c.pass_context
+def delivery_instruments(cxt, f):
+    provider = CCXTProvider("", "", ExchangeType.Okex)
+    ok_handler = OKExHandler(provider)
+    all_instruments = ok_handler.fetch_all_delivery_instruments()
+    for info in all_instruments:
+        if f is None or f.upper() in info['instrument_id']:
+            print("{}\t{}\t\t{}".format(info['instrument_id'], info.get('alias', 'forever'), info['contract_val']))

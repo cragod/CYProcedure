@@ -12,10 +12,16 @@ class OKExHandler:
         self.__all_swap_instruments = None
 
     def fetch_all_swap_instruments(self):
+        """所有的永续合约"""
         self.__all_swap_instruments = self.__ccxt_provider.ccxt_object_for_fetching.swapGetInstruments()
         return self.__all_swap_instruments
 
+    def fetch_all_delivery_instruments(self):
+        """所有的交割合约"""
+        return self.__ccxt_provider.ccxt_object_for_fetching.futuresGetInstruments()
+
     def fetch_swap_instrument_fund_rate(self, instrument_id):
+        """获取合约费率"""
         return self.__ccxt_provider.ccxt_object_for_fetching.swapGetInstrumentsInstrumentIdFundingTime({
             "instrument_id": instrument_id
         })
