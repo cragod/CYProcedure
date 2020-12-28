@@ -38,22 +38,21 @@ class CandleRealtimeCrawler:
                 if (start_time.replace(second=0) + timedelta(minutes=self.__duration) - datetime.now().astimezone(tz=pytz.utc)).seconds < 15:
                     print('{} {} 马上到下一个周期了，不试了'.format(config.coin_pair.formatted(), config.time_frame.value))
                     return
-                df = ExchangeFetcher(self.__config_reader.ccxt_provider).fetch_historical_candle_data_by_end_date(coin_pair,
-                                                                                                                  time_frame,
-                                                                                                                  datetime.now(),
-                                                                                                                  self.__using_limit)
+                df = ExchangeFetcher(self.__config_reader.ccxt_provider).fetch_real_time_candle_data(coin_pair, time_frame, self.__using_limit)
+
                 # 空的
                 if df.empty:
                     continue
 
-                df = df.sort_values(COL_CANDLE_BEGIN_TIME, ascending=False)
+                df = df.sort_values(COL_CANDLE_BEGIN_TIME)
 
                 delta = start_time - df.iloc[-1].candle_begin_time
 
+                print(df[-5:], delta.total_seconds())
                 if time_frame.value.endswith('m'):
-                    has_last = (delta.seconds % 3600 // 60) < int(time_frame.value[:-1])
+                    has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60
                 elif time_frame.value.endswith('h'):
-                    has_last = (delta.seconds % 3600 // 60) < int(time_frame.value[:-1]) * 60
+                    has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60 * 60
                 else:
                     print('time_interval不以m或者h结尾，出错，程序exit')
                     exit()
