@@ -17,6 +17,7 @@ class CandleRealtimeCrawler:
     """
 
     __config_reader: CrawlerConfigReader
+    __using_limit = 1440
 
     def __init__(self, config_reader, limit=10, duration=1):
         self.__config_reader = config_reader
@@ -40,22 +41,28 @@ class CandleRealtimeCrawler:
                 df = ExchangeFetcher(self.__config_reader.ccxt_provider).fetch_historical_candle_data_by_end_date(coin_pair,
                                                                                                                   time_frame,
                                                                                                                   datetime.now(),
-                                                                                                                  self.__limit)
+                                                                                                                  self.__using_limit)
                 # 空的
                 if df.empty:
                     continue
+
+                df = df.sort_values(COL_CANDLE_BEGIN_TIME, ascending=False)
+
                 delta = start_time - df.iloc[-1].candle_begin_time
+
                 if time_frame.value.endswith('m'):
                     has_last = (delta.seconds % 3600 // 60) < int(time_frame.value[:-1])
-                elif time_frame.vlaue.endswith('h'):
-                    has_last = (delta.days * 24 + delta.seconds // 3600) < int(time_frame.value[:-1])
+                elif time_frame.value.endswith('h'):
+                    has_last = (delta.seconds % 3600 // 60) < int(time_frame.value[:-1]) * 60
                 else:
                     print('time_interval不以m或者h结尾，出错，程序exit')
                     exit()
+
                 if not has_last:
                     print('{} {} 获取数据不包含最新的数据，重新获取'.format(config.coin_pair.formatted(), config.time_frame.value))
                     time.sleep(1)
                     continue
+
                 json_list = convert_df_to_json_list(df, COL_CANDLE_BEGIN_TIME)
                 candle_record_class_with_components(config.exchange_name, config.coin_pair, config.time_frame).bulk_upsert_records(json_list)
                 return
@@ -67,7 +74,7 @@ class CandleRealtimeCrawler:
     def __dispatch_task(self, configs):
         """分配任务"""
         try:
-            pool = Pool(processes=len(configs))
+            pool = Pool(processes=4)
             _ = pool.map(self.fetch_kline_and_save, configs)
         finally:
             pool.close()
@@ -76,6 +83,7 @@ class CandleRealtimeCrawler:
     def run_crawling(self):
         configs = self.__get_configs()
         self.__dispatch_task(configs)
+        self.__using_limit = self.__limit
         while True:
             # 等待到下一次
             current_time = datetime.now().astimezone(tz=pytz.utc)
