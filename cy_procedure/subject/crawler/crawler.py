@@ -17,7 +17,6 @@ class CandleRealtimeCrawler:
     """
 
     __config_reader: CrawlerConfigReader
-    __using_limit = 1440
 
     def __init__(self, config_reader, limit=10, duration=1):
         self.__config_reader = config_reader
@@ -38,17 +37,20 @@ class CandleRealtimeCrawler:
                 if (start_time.replace(second=0) + timedelta(minutes=self.__duration) - datetime.now().astimezone(tz=pytz.utc)).seconds < 15:
                     print('{} {} 马上到下一个周期了，不试了'.format(config.coin_pair.formatted(), config.time_frame.value))
                     return
-                df = ExchangeFetcher(self.__config_reader.ccxt_provider).fetch_real_time_candle_data(coin_pair, time_frame, self.__using_limit)
+                df = ExchangeFetcher(self.__config_reader.ccxt_provider).fetch_real_time_candle_data(coin_pair, time_frame, self.__limit)
 
                 # 空的
                 if df.empty:
                     continue
 
+                # 排序
                 df = df.sort_values(COL_CANDLE_BEGIN_TIME)
 
+                # 计算 delta
                 delta = start_time - df.iloc[-1].candle_begin_time
 
-                print(df[-5:], delta.total_seconds())
+                print(coin_pair.formatted(), df.shape[0], delta.total_seconds())
+                print(df[-1:])
                 if time_frame.value.endswith('m'):
                     has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60
                 elif time_frame.value.endswith('h'):
@@ -82,7 +84,6 @@ class CandleRealtimeCrawler:
     def run_crawling(self):
         configs = self.__get_configs()
         self.__dispatch_task(configs)
-        self.__using_limit = self.__limit
         while True:
             # 等待到下一次
             current_time = datetime.now().astimezone(tz=pytz.utc)
@@ -92,7 +93,5 @@ class CandleRealtimeCrawler:
             while True:  # 在靠近目标时间时
                 if datetime.now().astimezone(tz=pytz.utc) > next_time:
                     break
-            print('开始', self.__config_reader.name, datetime.now())
             configs = self.__get_configs()
             self.__dispatch_task(configs)
-            print('结束', self.__config_reader.name, datetime.now())
