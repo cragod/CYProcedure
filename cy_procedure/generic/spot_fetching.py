@@ -17,7 +17,6 @@ class ExchangeFetchingConfiguration:
     3. TimeFrame;
     4. Begin date;
     5. Fetching duration (Sleep after a fetching operation)
-    6. fetching_by_ccxt
     """
 
     def __init__(self,
@@ -25,7 +24,6 @@ class ExchangeFetchingConfiguration:
                  time_frame=TimeFrame.Minute_5,
                  sleep_duration=5,
                  op_type=ExchangeFetchingType.HISTORICAL,
-                 fetching_by_ccxt=True,
                  batch_limit=1000,
                  debug=False):
         super().__init__()
@@ -37,7 +35,6 @@ class ExchangeFetchingConfiguration:
         self.time_frame = time_frame
         self.op_type = op_type
         self.sleep_duration = sleep_duration
-        self.fetching_by_ccxt = fetching_by_ccxt
         self.batch_limit = batch_limit if batch_limit > 20 else 50
         self.debug = debug
 
@@ -86,8 +83,7 @@ class ExchangeFetchingProcedure:
             self.configuration.coin_pair,
             self.configuration.time_frame,
             since_ts,
-            self.configuration.batch_limit,
-            by_ccxt=self.configuration.fetching_by_ccxt)
+            self.configuration.batch_limit)
         return self.save_df(df)
 
     # Task

@@ -36,7 +36,8 @@ setup(
     description="Procedures based on components/widgets/dao",
     entry_points={
         'console_scripts': [
-            'cy_binance_interest=cy_procedure.cli:binance_interest',
+            'cybnc=cy_procedure.bnc_cli:cybnc',
+            'cyok=cy_procedure.ok_cli:cyok',
         ],
     },
     install_requires=requirements,
@@ -49,6 +50,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/cragod/CYProcedure',
-    version='0.3.11',
+    version='0.4.0',
     zip_safe=False,
 )
