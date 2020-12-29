@@ -67,7 +67,6 @@ class OKExHandler:
         for _ in range(max_try_amount):
             try:
                 future_info = self.__ccxt_provider.ccxt_object_for_fetching.futures_get_accounts()['info']
-                print(future_info)
                 df = pd.DataFrame(future_info, dtype=float).T  # 将数据转化为df格式
                 return df
             except Exception as e:
