@@ -7,6 +7,7 @@ from cy_data_access.models.quant import *
 from cy_data_access.models.config import *
 from cy_data_access.models.market import *
 from ...util.helper import ProcedureHelper as ph
+from ...util.logger import *
 
 
 class BaseBrickCarrier(ABC):
@@ -14,9 +15,11 @@ class BaseBrickCarrier(ABC):
 
     _short_sleep_time = 1
 
-    def __init__(self, bc_cfg: BrickCarrierCfg):
+    def __init__(self, bc_cfg: BrickCarrierCfg, wechat_token, log_type):
         # 整体配置
         self._bc_cfg = bc_cfg
+        self.__wechat_token = wechat_token
+        self.__log_type = log_type
 
         # ccxt 初始化
         ccxt_cfg = CCXTConfiguration.configuration_with_id(bc_cfg.ccxt_cfg_id)
@@ -44,6 +47,10 @@ class BaseBrickCarrier(ABC):
 
     def __str__(self):
         return "{}\n{}\n{}".format(self._bc_cfg, self._ccxt_provider, self._strategy_cfgs)
+
+    @property
+    def _generate_recorder(self):
+        return PersistenceRecorder(self.__wechat_token, MessageType.WeChatWork, self.__log_type)
 
     def _all_next_run_time_infos(self):
         """获取所有策略下一次执行时间"""

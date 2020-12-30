@@ -1,3 +1,4 @@
+import traceback
 import math
 import pandas as pd
 from datetime import datetime
@@ -153,7 +154,7 @@ class OKExHandler:
 
         raise ValueError('通过ccxt的通过futures_get_position获取所有合约的持仓信息，失败次数过多，程序Raise Error')
 
-    def update_symbol_info(self, symbol_info, instrument_id_list):
+    def update_symbol_info(self, symbol_info, instrument_id_list, index_mapping_dict):
         """
         ==== 根据账户信息、持仓信息，更新symbol_info ===
         本函数通过ccxt_fetch_future_account()获取合约账户信息，ccxt_fetch_future_position()获取合约账户持仓信息，并用这些信息更新symbol_config
@@ -167,12 +168,14 @@ class OKExHandler:
         future_account = self.fetch_future_account()
         # 将账户信息和symbol_info合并
         if future_account.empty is False:
+            future_account.rename(index=index_mapping_dict, inplace=True)
             symbol_info['账户权益'] = future_account['equity']
 
         # 通过交易所接口获取合约账户持仓信息
         future_position = self.fetch_future_position()
         # 将持仓信息和symbol_info合并
         if future_position.empty is False:
+            future_position.rename(index=index_mapping_dict, inplace=True)
             # 去除无关持仓：账户中可能存在其他合约的持仓信息，这些合约不在symbol_config中，将其删除。
             future_position = future_position[future_position.instrument_id.isin(instrument_id_list)]
 
@@ -257,13 +260,20 @@ class OKExHandler:
 
         # 当账户没有持仓时，是开仓
         price = signal_price
-        coin_value = [coin_value_table[x] for x in coin_value_table if (x + '-').upper() in coin_pair_str.upper()]  # 取出对应面值 (区分 USDT/USD)
+        coin_value = [coin_value_table[x] for x in coin_value_table if (x + '-').upper() in coin_pair_str.upper()][0]  # 取出对应面值 (区分 USDT/USD)
         # 不超过账户最大杠杆
         l = float(leverage)
         size = math.floor(equity_balance * l * volatility_ratio / (price * coin_value))
         return max(size, 1)  # 防止出现size为情形0，设置最小下单量为1
 
-    def okex_future_place_order(self, coin_pair_str, symbol_signals, signal_price, holding, equity_balance, leverage, max_try_amount=5):
+    def cal_order_price(self, price, order_type, ratio=0.02):
+        """ 为了达到成交的目的，计算实际委托价格会向上或者向下浮动一定比例默认为0.02 """
+        if order_type in [1, 4]:
+            return price * (1 + ratio)
+        elif order_type in [2, 3]:
+            return price * (1 - ratio)
+
+    def okex_future_place_order(self, underlying, coin_pair_str, symbol_signals, signal_price, holding, equity_balance, leverage, max_try_amount=5):
         """
         # 在合约市场下单
         :param symbol_info:
@@ -288,12 +298,12 @@ class OKExHandler:
                     # "长度为2的判定"定位【平空，开多】或【平多，开空】两种情形，"下单类型判定"定位 处于开仓的情形。
                     if len(symbol_signals) == 2 and order_type in [1, 2]:  # 当两个条件同时满足时，说明当前处于平仓后，需要再开仓的阶段。
                         time.sleep(self.short_sleep_time)  # 短暂的休息1s，防止之平仓后，账户没有更新
-                        equity_balance = self.fetch_account_equity(coin_pair_str.upper())
+                        equity_balance = self.fetch_account_equity(underlying)
 
                     # 确定下单参数
                     params['type'] = str(order_type)
-                    params['price'] = signal_price
-                    params['size'] = int(self.cal_order_size(coin_pair_str, holding, signal_price, equity_balance, leverage))
+                    params['price'] = self.cal_order_price(signal_price, order_type)
+                    params['size'] = int(self.cal_order_size(coin_pair_str, holding, signal_price, float(equity_balance), leverage))
 
                     if update_price_flag:
                         # {'instrument_id': 'BTC-USDT-200626',
@@ -318,7 +328,7 @@ class OKExHandler:
                     break
 
                 except Exception as e:
-                    print(e)
+                    print(traceback.format_exc())
                     print(coin_pair_str, '下单失败，稍等后继续尝试')
                     time.sleep(self.short_sleep_time)
                     '''
