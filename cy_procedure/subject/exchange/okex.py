@@ -4,9 +4,42 @@ from datetime import datetime
 from cy_widgets.exchange.provider import *
 from cy_widgets.trader.exchange_trader import *
 
+# 订单对照表
+okex_order_type = {
+    '1': '开多',
+    '2': '开空',
+    '3': '平多',
+    '4': '平空',
+}
+
+# 币种面值对照表
+coin_value_table = {
+    "btc-usdt": 0.01,
+    "eos-usdt": 10,
+    "eth-usdt": 0.1,
+    "ltc-usdt": 1,
+    "bch-usdt": 0.1,
+    "xrp-usdt": 100,
+    "etc-usdt": 10,
+    "bsv-usdt": 1,
+    "trx-usdt": 1000
+}
+
+# 订单状态对照表
+okex_order_state = {
+    '-2': '失败',
+    '-1': '撤单成功',
+    '0': '等待成交',
+    '1': '部分成交',
+    '2': '完全成交',
+    '3': '下单中',
+    '4': '撤单中',
+}
+
 
 class OKExHandler:
 
+    short_sleep_time = 1
     medium_sleep_time = 2
 
     def __init__(self, ccxt_provider: CCXTProvider):
@@ -190,3 +223,167 @@ class OKExHandler:
             symbol_info['持仓方向'].fillna(value=0, inplace=True)
 
         return symbol_info
+
+    def fetch_account_equity(self, symbol, max_try_amount=5):
+        """
+        # ===获取指定账户，例如btcusdt合约，目前的现金余额。
+        使用okex私有函数，GET/api/futures/v3/accounts/<underlying>，获取指定币种的账户现金余额。
+        :param exchange:
+        :param underlying:  例如btc-usd，btc-usdt
+        :param max_try_amount:
+        :return:
+        """
+        for _ in range(max_try_amount):
+            try:
+                result = self.__ccxt_provider.ccxt_object_for_fetching.futures_get_accounts_underlying(params={"underlying": symbol.lower()})
+                return float(result['equity'])
+            except Exception as e:
+                print(e)
+                print('ccxt_update_account_equity函数获取账户可用余额失败，稍后重试')
+                time.sleep(self.short_sleep_time)
+
+    def cal_order_size(self, coin_pair_str, holding, signal_price, equity_balance, leverage, volatility_ratio=0.98):
+        """
+        根据实际持仓以及杠杆数，计算实际开仓张数
+        :param symbol:
+        :param symbol_info:
+        :param leverage:
+        :param volatility_ratio:
+        :return:
+        """
+        # 当账户目前有持仓的时候，必定是要平仓，所以直接返回持仓量即可
+        if pd.notna(holding):  # 不为空
+            return holding
+
+        # 当账户没有持仓时，是开仓
+        price = signal_price
+        coin_value = [coin_value_table[x] for x in coin_value_table if (x + '-').upper() in coin_pair_str.upper()]  # 取出对应面值 (区分 USDT/USD)
+        # 不超过账户最大杠杆
+        l = float(leverage)
+        size = math.floor(equity_balance * l * volatility_ratio / (price * coin_value))
+        return max(size, 1)  # 防止出现size为情形0，设置最小下单量为1
+
+    def okex_future_place_order(self, coin_pair_str, symbol_signals, signal_price, holding, equity_balance, leverage, max_try_amount=5):
+        """
+        # 在合约市场下单
+        :param symbol_info:
+        :param symbol_config:
+        :param symbol_signal:
+        :param max_try_amount:
+        :return:
+        """
+        # 下单参数
+        params = {
+            'instrument_id': coin_pair_str  # 合约代码
+        }
+
+        order_id_list = []
+        # 按照交易信号下单
+        for order_type in symbol_signals:
+            update_price_flag = False  # 当触发限价条件时会设置为True
+            for i in range(max_try_amount):
+                try:
+                    # 当只要开仓或者平仓时，直接下单操作即可。但当本周期即需要平仓，又需要开仓时，需要在平完仓之后，
+                    # 重新评估下账户资金，然后根据账户资金计算开仓账户然后开仓。下面这行代码即处理这个情形。
+                    # "长度为2的判定"定位【平空，开多】或【平多，开空】两种情形，"下单类型判定"定位 处于开仓的情形。
+                    if len(symbol_signals) == 2 and order_type in [1, 2]:  # 当两个条件同时满足时，说明当前处于平仓后，需要再开仓的阶段。
+                        time.sleep(self.short_sleep_time)  # 短暂的休息1s，防止之平仓后，账户没有更新
+                        equity_balance = self.fetch_account_equity(coin_pair_str.upper())
+
+                    # 确定下单参数
+                    params['type'] = str(order_type)
+                    params['price'] = signal_price
+                    params['size'] = int(self.cal_order_size(coin_pair_str, holding, signal_price, equity_balance, leverage))
+
+                    if update_price_flag:
+                        # {'instrument_id': 'BTC-USDT-200626',
+                        #  'highest': '7088.5',
+                        #  'lowest': '6674.2',
+                        #  'timestamp': '2020-04-22T06:21:12.441Z'}
+                        # 获取当前限价
+                        response = self.__ccxt_provider.ccxt_object_for_fetching.futures_get_instruments_instrument_id_price_limit({"instrument_id": coin_pair_str})
+                        # 依据下单类型来判定，所用的价格
+                        order_type_tmp = int(params['type'])
+                        # 开多和平空，对应买入合约取最高
+                        if order_type_tmp in [1, 4]:
+                            params['price'] = float(response['highest'])
+                        elif order_type_tmp in [2, 3]:
+                            params['price'] = float(response['lowest'])
+                        update_price_flag = False
+
+                    print('开始下单：', datetime.now())
+                    order_info = self.__ccxt_provider.ccxt_object_for_order.futures_post_order(params)
+                    order_id_list.append(order_info['order_id'])
+                    print(order_info, '下单完成：', datetime.now())
+                    break
+
+                except Exception as e:
+                    print(e)
+                    print(coin_pair_str, '下单失败，稍等后继续尝试')
+                    time.sleep(self.short_sleep_time)
+                    '''
+                    okex {"error_message":"Order price cannot be more than 103% or less than 97% of the previous minute price","code":32019,"error_code":"32019",
+                    "message":"Order price cannot be more than 103% or less than 97% of the previous minute price"}
+                    '''
+                    # error code 与错误是一一对应的关系，32019代表相关错误
+                    if "32019" in str(e):
+                        update_price_flag = True
+
+                    if i == (max_try_amount - 1):
+                        print('下单失败次数超过max_try_amount，终止下单')
+                        raise ValueError('下单失败次数超过max_try_amount')
+        return order_id_list
+
+    def update_future_order_info(self, coin_pair_str, order_ids, max_try_amount=5):
+        """
+        根据订单号，检查订单信息，获得相关数据
+        :param exchange:
+        :param symbol_config:
+        :param symbol_order:
+        :param max_try_amount:
+        :return:
+
+        函数返回值案例：
+                                symbol      信号价格                       信号时间  订单状态 开仓方向 委托数量 成交数量    委托价格    成交均价                      委托时间
+        4476028903965698  eth-usdt  227.1300 2020-03-01 11:53:00.580063  完全成交   开多  100  100  231.67  227.29  2020-03-01T03:53:00.896Z
+        4476028904156161  xrp-usdt    0.2365 2020-03-01 11:53:00.580558  完全成交   开空  100  100  0.2317  0.2363  2020-03-01T03:53:00.906Z
+        """
+
+        all_order_infos = dict()
+        # 这个遍历下单id
+        for order_id in order_ids:
+            time.sleep(self.medium_sleep_time)  # 每次获取下单数据时sleep一段时间
+            order_info = None
+            # 根据下单id获取数据
+            for i in range(max_try_amount):
+                try:
+                    para = {
+                        'instrument_id': coin_pair_str,
+                        'order_id': order_id
+                    }
+                    order_info = self.__ccxt_provider.ccxt_object_for_query.futures_get_orders_instrument_id_order_id(para)
+                    break
+                except Exception as e:
+                    print(e)
+                    print('根据订单号获取订单信息失败，稍后重试')
+                    time.sleep(self.medium_sleep_time)
+                    if i == max_try_amount - 1:
+                        raise ValueError('重试次数过多，获取订单信息失败，程序退出')
+
+            if order_info:
+                info_dict = {
+                    "订单状态": okex_order_state[order_info["state"]],
+                    "开仓方向": okex_order_type[order_info["type"]],
+                    "委托数量": order_info["size"],
+                    "成交数量": order_info["filled_qty"],
+                    "委托价格": order_info["price"],
+                    "成交均价": order_info["price_avg"],
+                    "委托时间": order_info["timestamp"]
+                }
+                if okex_order_state[order_info["state"]] == '失败':
+                    print('下单失败')
+                all_order_infos[order_id] = info_dict
+            else:
+                print('根据订单号获取订单信息失败次数超过max_try_amount，发送钉钉')
+
+        return all_order_infos
