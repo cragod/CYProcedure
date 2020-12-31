@@ -75,8 +75,10 @@ class OKDeliveryBC(BaseBrickCarrier):
                         time.sleep(0.5)
                 else:
                     break
+            recorder.append_summary_log("**K线({})**: {}".format(candle_df.iloc[-1].candle_begin_time, candle_df.shape[0]))
             # 策略信号
             signals = self.__calculate_signal(strategy, cal_signal_df, cfg.coin_pair)
+            recorder.append_summary_log("**信号**: {}".format(signals))
             # 假信号逻辑
             # signals = self.__real_signal_random(cfg.coin_pair)
             print('{} 信号'.format(cfg.coin_pair), signals)
