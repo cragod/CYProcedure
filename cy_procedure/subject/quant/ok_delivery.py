@@ -120,7 +120,7 @@ class OKDeliveryBC(BaseBrickCarrier):
                     key_names = ['持仓量', '持仓收益率', '持仓收益', '持仓均价', '当前价格']
                     for name in key_names:
                         recorder.append_summary_log("**{}**: {}".format(name, info_dict[name]))
-            recorder.record_summary_log()
+            recorder.record_summary_log("{}".format(datetime.now()))
         except Exception as e:
             self._generate_recorder.record_exception("策略({})中断: {}".format(strategy_id, traceback.format_exc()))
 
