@@ -59,7 +59,7 @@ class OKDeliveryBC(BaseBrickCarrier):
             cfg: StrategyCfg = list(filter(lambda x: x.identifier == strategy_id, self._strategy_cfgs))[0]
             strategy: BaseExchangeStrategy = self._strategy_from_cfg(cfg)
             current_time = self.__next_run_time.astimezone()  # 用来过滤最近一根K线
-            recorder.append_summary_log("**{}-{}-{}**".format(cfg.strategy_name, cfg.coin_pair, cfg.identifier))
+            recorder.append_summary_log("**{}-{}-{}**".format(cfg.coin_pair, cfg.strategy_name, cfg.identifier))
             # 取K线
             while True:
                 candle_df = self._fetch_candle_for_strategy(ContractCoinPair.coin_pair_with(cfg.coin_pair, '-'),
@@ -67,7 +67,8 @@ class OKDeliveryBC(BaseBrickCarrier):
                                                             limit=strategy.candle_count_for_calculating)
                 # 用来计算信号的，把最新这根删掉
                 cal_signal_df = candle_df[candle_df.candle_begin_time < current_time]
-                if cal_signal_df is None or cal_signal_df.empty or cal_signal_df.shape[0] == 0:
+                # 剪掉最近的以后数量还一样，就是没最新了
+                if cal_signal_df is None or cal_signal_df.empty or cal_signal_df.shape[0] == candle_df.shape[0]:
                     if datetime.now() > self.__next_run_time + timedelta(minutes=1):
                         raise ValueError('{} 时间超过3分钟，放弃，返回空数据'.format(cfg.coin_pair))
                     else:
@@ -75,7 +76,6 @@ class OKDeliveryBC(BaseBrickCarrier):
                         time.sleep(0.5)
                 else:
                     break
-            recorder.append_summary_log("**K线({})**: {}".format(candle_df.iloc[-1].candle_begin_time, candle_df.shape[0]))
             # 策略信号
             signals = self.__calculate_signal(strategy, cal_signal_df, cfg.coin_pair)
             recorder.append_summary_log("**信号**: {}".format(signals))
