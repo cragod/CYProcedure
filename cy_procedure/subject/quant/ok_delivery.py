@@ -59,7 +59,7 @@ class OKDeliveryBC(BaseBrickCarrier):
             cfg: StrategyCfg = list(filter(lambda x: x.identifier == strategy_id, self._strategy_cfgs))[0]
             strategy: BaseExchangeStrategy = self._strategy_from_cfg(cfg)
             current_time = self.__next_run_time.astimezone()  # 用来过滤最近一根K线
-            recorder.append_summary_log("**{}-{}-{}**".format(cfg.coin_pair, cfg.strategy_name, cfg.identifier))
+            recorder.append_summary_log("**{}-{}-{}**".format(cfg.strategy_name, cfg.coin_pair, cfg.identifier))
             # 取K线
             while True:
                 candle_df = self._fetch_candle_for_strategy(ContractCoinPair.coin_pair_with(cfg.coin_pair, '-'),
@@ -175,13 +175,15 @@ class OKDeliveryBC(BaseBrickCarrier):
         now_pos = self.__symbol_info_df.at[coin_pair_str, '持仓方向']  # 当前持仓方向
         avg_price = self.__symbol_info_df.at[coin_pair_str, '持仓均价']  # 当前持仓均价（后面用来控制止盈止损
 
+        print('now pos', now_pos)
         # 需要计算的目标仓位
         target_pos = None
         symbol_signal = None
 
         # 根据策略计算出目标交易信号。
         if not df.empty:  # 当原始数据不为空的时候
-            target_pos = strategy.calculate_realtime_signals(df, avg_price)
+            # TODO Debug
+            target_pos = strategy.calculate_realtime_signals(df, avg_price, debug=True)
 
         # 根据目标仓位和实际仓位，计算实际操作，"1": "开多"，"2": "开空"，"3": "平多"， "4": "平空"
         if now_pos == 1 and target_pos == 0:  # 平多
