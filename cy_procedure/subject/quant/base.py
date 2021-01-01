@@ -15,8 +15,9 @@ class BaseBrickCarrier(ABC):
 
     _short_sleep_time = 1
 
-    def __init__(self, bc_cfg: BrickCarrierCfg, wechat_token, log_type):
+    def __init__(self, bc_cfg: BrickCarrierCfg, wechat_token, log_type, debug=False):
         # 整体配置
+        self._debug = debug
         self._bc_cfg = bc_cfg
         self.__wechat_token = wechat_token
         self.__log_type = log_type

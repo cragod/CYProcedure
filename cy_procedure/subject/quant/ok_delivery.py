@@ -35,17 +35,23 @@ class OKDeliveryBC(BaseBrickCarrier):
             all_next_time_infos = self._all_next_run_time_infos()
             # 取最小的作为下次开始
             self.__next_run_time = min(all_next_time_infos.values())
-            print('策略执行时间:')
-            for nt_key in all_next_time_infos:
-                print(nt_key, list(filter(lambda x: x.identifier == nt_key, self._strategy_cfgs))[0].coin_pair, ': ', all_next_time_infos[nt_key])
-            print('下次执行时间: ', self.__next_run_time)
-            # 取最近的，等等等
-            time.sleep(max(0, (self.__next_run_time - datetime.now()).seconds))
-            while True:  # 在靠近目标时间时
-                if datetime.now() > self.__next_run_time:
-                    break
-            # 到时间的策略进入流程
-            to_run_strategie_ids = [s_id for s_id in all_next_time_infos.keys() if all_next_time_infos[s_id] == self.__next_run_time]
+            # 非 Debug 下才等
+            if not self._debug:
+                print('策略执行时间:')
+                for nt_key in all_next_time_infos:
+                    print(nt_key, list(filter(lambda x: x.identifier == nt_key, self._strategy_cfgs))[0].coin_pair, ': ', all_next_time_infos[nt_key])
+                print('下次执行时间: ', self.__next_run_time)
+                # 取最近的，等等等
+                time.sleep(max(0, (self.__next_run_time - datetime.now()).seconds))
+                while True:  # 在靠近目标时间时
+                    if datetime.now() > self.__next_run_time:
+                        break
+            if self._debug:
+                # 测试直接全运行
+                to_run_strategie_ids = all_next_time_infos.keys()
+            else:
+                # 到时间的策略进入流程
+                to_run_strategie_ids = [s_id for s_id in all_next_time_infos.keys() if all_next_time_infos[s_id] == self.__next_run_time]
             with Pool(processes=4) as pool:
                 pool.map(self.single_strategy_procedure, to_run_strategie_ids)
             # 本次循环结束
@@ -67,8 +73,10 @@ class OKDeliveryBC(BaseBrickCarrier):
                                                             limit=strategy.candle_count_for_calculating)
                 # 用来计算信号的，把最新这根删掉
                 cal_signal_df = candle_df[candle_df.candle_begin_time < current_time]
+                if self._debug:
+                    break
                 # 剪掉最近的以后数量还一样，就是没最新了
-                if cal_signal_df is None or cal_signal_df.empty or cal_signal_df.shape[0] == candle_df.shape[0]:
+                elif cal_signal_df is None or cal_signal_df.empty or cal_signal_df.shape[0] == candle_df.shape[0]:
                     if datetime.now() > self.__next_run_time + timedelta(minutes=1):
                         raise ValueError('{} 时间超过3分钟，放弃，返回空数据'.format(cfg.coin_pair))
                     else:
@@ -84,7 +92,7 @@ class OKDeliveryBC(BaseBrickCarrier):
             print('{} 信号'.format(cfg.coin_pair), signals)
             # 策略下单
             order_infos = None
-            if signals:
+            if signals and not self._debug:  # 测试模式下不进
                 signal_price = candle_df.iloc[-1].close  # 最后一根K线的收盘价作为信号价
                 holding = self.__symbol_info_df.at[cfg.coin_pair, "持仓量"]
                 equity = self.__symbol_info_df.at[cfg.coin_pair, "账户权益"]
@@ -183,7 +191,7 @@ class OKDeliveryBC(BaseBrickCarrier):
         # 根据策略计算出目标交易信号。
         if not df.empty:  # 当原始数据不为空的时候
             # TODO Debug
-            target_pos = strategy.calculate_realtime_signals(df, avg_price, debug=True)
+            target_pos = strategy.calculate_realtime_signals(df, avg_price, debug=self._debug)
 
         # 根据目标仓位和实际仓位，计算实际操作，"1": "开多"，"2": "开空"，"3": "平多"， "4": "平空"
         if now_pos == 1 and target_pos == 0:  # 平多
