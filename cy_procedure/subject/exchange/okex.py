@@ -23,7 +23,8 @@ coin_value_table = {
     "xrp-usdt": 100,
     "etc-usdt": 10,
     "bsv-usdt": 1,
-    "trx-usdt": 1000
+    "trx-usdt": 1000,
+    'dot-usdt': 1,
 }
 
 # 订单状态对照表
