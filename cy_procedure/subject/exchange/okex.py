@@ -25,6 +25,7 @@ coin_value_table = {
     "bsv-usdt": 1,
     "trx-usdt": 1000,
     'dot-usdt': 1,
+    'link-usdt': 1,
 }
 
 # 订单状态对照表
