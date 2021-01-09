@@ -35,8 +35,8 @@ class OKDeliveryBC(BaseBrickCarrier):
             all_next_time_infos = self._all_next_run_time_infos()
             # 取最小的作为下次开始
             self.__next_run_time = min(all_next_time_infos.values())
-            # 非 Debug 下才等
-            if not self._debug:
+            # 非 Debug || Debug 模式也等 = 等待
+            if not self._debug or self._sleep_when_debug:
                 print('策略执行时间:')
                 for nt_key in all_next_time_infos:
                     print(nt_key, list(filter(lambda x: x.identifier == nt_key, self._strategy_cfgs))[0].coin_pair, ': ', all_next_time_infos[nt_key])
@@ -85,7 +85,7 @@ class OKDeliveryBC(BaseBrickCarrier):
                 else:
                     break
             # 策略信号
-            signals = self.__calculate_signal(strategy, cal_signal_df, cfg.coin_pair)
+            signals = self.__calculate_signal(strategy, cal_signal_df, cfg.coin_pair, strategy_id=strategy_id)
             recorder.append_summary_log("**信号**: {}".format(signals))
             # 假信号逻辑
             # signals = self.__real_signal_random(cfg.coin_pair)
@@ -175,13 +175,21 @@ class OKDeliveryBC(BaseBrickCarrier):
 
         return symbol_signal
 
-    def __calculate_signal(self, strategy: BaseExchangeStrategy, candle_data, coin_pair_str):
+    def __calculate_signal(self, strategy: BaseExchangeStrategy, candle_data, coin_pair_str, strategy_id):
         """计算信号，根据持仓情况给出最终信号（止盈止损情况后面加"""
+
+        # 策略保存的信息
+        strategy_position = StrategyPosition.position_with(strategy_id)
+
+        def saver(strategy_info):
+            # 保存方法
+            strategy_position.strategy_info = strategy_info
+            strategy_position.save()
 
         # 赋值相关数据
         df = candle_data.copy()  # 最新数据
         now_pos = self.__symbol_info_df.at[coin_pair_str, '持仓方向']  # 当前持仓方向
-        avg_price = self.__symbol_info_df.at[coin_pair_str, '持仓均价']  # 当前持仓均价（后面用来控制止盈止损
+        # avg_price = self.__symbol_info_df.at[coin_pair_str, '持仓均价']  # 当前持仓均价（后面用来控制止盈止损
 
         print('now pos', now_pos)
         # 需要计算的目标仓位
@@ -190,8 +198,7 @@ class OKDeliveryBC(BaseBrickCarrier):
 
         # 根据策略计算出目标交易信号。
         if not df.empty:  # 当原始数据不为空的时候
-            # TODO Debug
-            target_pos = strategy.calculate_realtime_signals(df, avg_price, debug=self._debug)
+            target_pos = strategy.calculate_realtime_signals(df, debug=self._debug, position_info=strategy_position.strategy_info, position_info_save_func=saver)
 
         # 根据目标仓位和实际仓位，计算实际操作，"1": "开多"，"2": "开空"，"3": "平多"， "4": "平空"
         if now_pos == 1 and target_pos == 0:  # 平多

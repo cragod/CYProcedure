@@ -6,6 +6,7 @@ from cy_widgets.strategy.exchange import *
 from cy_data_access.models.quant import *
 from cy_data_access.models.config import *
 from cy_data_access.models.market import *
+from cy_data_access.models.position import *
 from ...util.helper import ProcedureHelper as ph
 from ...util.logger import *
 
@@ -14,6 +15,7 @@ class BaseBrickCarrier(ABC):
     """搬砖人基类"""
 
     _short_sleep_time = 1
+    _sleep_when_debug = False  # debug 模式下默认不睡
 
     def __init__(self, bc_cfg: BrickCarrierCfg, wechat_token, log_type, debug=False):
         # 整体配置
