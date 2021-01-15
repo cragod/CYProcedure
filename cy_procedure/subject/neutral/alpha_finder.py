@@ -309,7 +309,7 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
     # ===将数据转化为需要的周期
     # 在数据最前面，增加一行数据，这是为了在对>24h的周期进行resample时，保持数据的一致性。
     df = df.loc[0:0, :].append(df, ignore_index=True)
-    df.loc[0, 'candle_begin_time'] = dfr.convert_string_to_local_date('2020-01-01 00:00:00').astimezone(pytz.utc)
+    df.loc[0, 'candle_begin_time'] = dfr.convert_string_to_local_date('2020-01-01 00:00:00').replace(tzinfo=pytz.utc)
 
     # 转换周期
     df['周期开始时间'] = df['candle_begin_time']
@@ -349,7 +349,7 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
         # 开始时间为 2010-01-01 00:00:00  在有交易数据的之前 除candle_begin_time列皆为 NaN
 
         # 在24h之内 base 和 offset 一样
-        period_df = df.resample(_hold_hour, offset=offset).agg(agg_dict)
+        period_df = df.resample(_hold_hour, offset=f'{offset}h').agg(agg_dict)
         # period_df = df.resample(_hold_hour, base=offset).agg(agg_dict)
 
         # 上一行代码对数据转换完周期后，刚开始会有大量的空数据，没有必要对这些数据进行删除，因为后面会删除18年之前的数据。
