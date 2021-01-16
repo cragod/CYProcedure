@@ -74,13 +74,15 @@ def gen_select_df(_df, _c_rate, _select_num, _factor, _reverse):
 
     # 根据因子对比进行排名
     # 从小到大排序
+    df['condition_long'] = df['close'] >= df['lower']  # 破下轨，不做多
+    df['condition_short'] = df['close'] <= df['upper']  # 破上轨，不做空
     df['排名1'] = df.groupby('candle_begin_time')['因子'].rank()
-    df1 = df[df['排名1'] <= _select_num].copy()
+    df1 = df[(df['排名1'] <= _select_num) & (df['condition_long'] == True)].copy()
     df1['方向'] = 1
 
     # 从大到小排序
     df['排名2'] = df.groupby('candle_begin_time')['因子'].rank(ascending=False)
-    df2 = df[df['排名2'] <= _select_num].copy()
+    df2 = df[(df['排名2'] <= _select_num) & (df['condition_short'] == True)].copy()
     df2['方向'] = -1
 
     # 合并排序结果
@@ -125,13 +127,15 @@ def gen_select_df_for_set(_df, _c_rate, _select_num, _factor_set, _reverse):
 
     # 根据因子对比进行排名
     # 从小到大排序
+    df['condition_long'] = df['close'] >= df['lower']  # 破下轨，不做多
+    df['condition_short'] = df['close'] <= df['upper']  # 破上轨，不做空
     df['排名1'] = df.groupby('candle_begin_time')['因子'].rank()
-    df1 = df[df['排名1'] <= _select_num].copy()
+    df1 = df[(df['排名1'] <= _select_num) & (df['condition_long'] == True)].copy()
     df1['方向'] = 1
 
     # 从大到小排序
     df['排名2'] = df.groupby('candle_begin_time')['因子'].rank(ascending=False)
-    df2 = df[df['排名2'] <= _select_num].copy()
+    df2 = df[(df['排名2'] <= _select_num) & (df['condition_short'] == True)].copy()
     df2['方向'] = -1
 
     # 合并排序结果

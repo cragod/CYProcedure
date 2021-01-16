@@ -305,6 +305,16 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
         # 差分
         __add_diff(_df=df, _d_list=diff_d, _name=f'量价相关系数_bh_{n}', _agg_dict=extra_agg_dict, _agg_type='first')
 
+    # 原版自适应布林通道
+    boll_n = 34
+    df['median'] = df['close'].rolling(window=boll_n).mean()
+    df['std'] = df['close'].rolling(boll_n, min_periods=1).std(ddof=0)  # ddof代表标准差自由度
+    df['z_score'] = abs(df['close'] - df['median']) / df['std']
+    df['up'] = df['z_score'].rolling(window=boll_n).max().shift(1)
+    df['dn'] = df['z_score'].rolling(window=boll_n).min().shift(1)
+    df['upper'] = df['median'] + df['std'] * df['up']
+    df['lower'] = df['median'] - df['std'] * df['up']
+
     """ ******************** 以上是需要修改的代码 ******************** """
     # ===将数据转化为需要的周期
     # 在数据最前面，增加一行数据，这是为了在对>24h的周期进行resample时，保持数据的一致性。
@@ -324,6 +334,8 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
         'close': 'last',
         '下个周期_avg_price': 'last',
         'volume': 'sum',
+        'upper': 'first',
+        'lower': 'first'
     }
     agg_dict = dict(agg_dict, **extra_agg_dict)  # 需要保留的列 必备字段 + 因子字段
 
@@ -349,8 +361,8 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
         # 开始时间为 2010-01-01 00:00:00  在有交易数据的之前 除candle_begin_time列皆为 NaN
 
         # 在24h之内 base 和 offset 一样
-        period_df = df.resample(_hold_hour, offset=f'{offset}h').agg(agg_dict)
-        # period_df = df.resample(_hold_hour, base=offset).agg(agg_dict)
+        # period_df = df.resample(_hold_hour, offset=f'{offset}h').agg(agg_dict)
+        period_df = df.resample(_hold_hour, base=offset).agg(agg_dict)
 
         # 上一行代码对数据转换完周期后，刚开始会有大量的空数据，没有必要对这些数据进行删除，因为后面会删除18年之前的数据。
         # 添加 offset 标签列
@@ -550,8 +562,7 @@ def find_factors_ind(_dna, hold_hour, data_path, factors, head_pkl, c_rate, sele
 
     data_pkl[factor] =\
         data_pkl[factors[0]] * (data_pkl[_dna[0]] + data_pkl[_dna[1]]) +\
-        data_pkl[factors[1]] * (data_pkl[_dna[2]] + data_pkl[_dna[3]]) +\
-        data_pkl[factors[2]] * (data_pkl[_dna[4]] + data_pkl[_dna[5]])
+        data_pkl[factors[1]] * (data_pkl[_dna[2]] + data_pkl[_dna[3]])
 
     factor_r = []
     for _offset in range(int(hold_hour[:-1])):
@@ -575,7 +586,7 @@ def ea(_filename, ga_output_path, ppp_csv_path, hold_hour, data_path, factors, h
     opt_value = 0  # 记录 最优值
     opt_record = {}  # 记录 曾经出现的最优个体
     opt_df = pd.DataFrame()
-    dna_length = 6  # dna位数
+    dna_length = 4  # dna位数
 
     parent = fixed_seeds if using_fixed_seeds else np.random.choice(dna_range, dna_length, replace=True)  # 父代
 
