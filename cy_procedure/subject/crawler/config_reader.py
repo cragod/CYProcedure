@@ -3,12 +3,14 @@ from cy_widgets.exchange.provider import *
 from cy_data_access.models.crawler import *
 from cy_components.defines.enums import *
 from cy_components.utils.coin_pair import *
+from ..exchange.binance import *
 
 
 class CrawlerItemConfig:
     coin_pair: CoinPair
     time_frame: TimeFrame
     exchange_name: str
+    coin_tail = ''
 
 
 class CrawlerConfigReader(ABC):
@@ -43,7 +45,7 @@ class BinanceDeliveryCrawlerConfigReader(CrawlerConfigReader):
 
     def __init__(self):
         super().__init__()
-        self.__provider = CCXTProvider("", "", ExchangeType.Binance, {
+        self.__provider = CCXTProvider("", "", ExchangeType.BinanceSpotFetching, {
             'defaultType': 'delivery'
         })
 
@@ -54,6 +56,40 @@ class BinanceDeliveryCrawlerConfigReader(CrawlerConfigReader):
     @property
     def configs(self):
         return self._fetch_configs(CrawlerType.BNC_DELIVERY)
+
+    @property
+    def ccxt_provider(self):
+        return self.__provider
+
+
+class BinanceFutureCrawlerConfigReader(CrawlerConfigReader):
+    """币安 USDT 永续合约"""
+
+    def __init__(self):
+        super().__init__()
+        self.__provider = CCXTProvider("", "", ExchangeType.BinanceSpotFetching, {
+            'defaultType': 'future'
+        })
+
+    @property
+    def name(self):
+        return "Binance.Future"
+
+    @property
+    def configs(self):
+        cfg: CrawlerRealtimeConfig = list(CrawlerRealtimeConfig.objects.raw({'exchange_type': CrawlerType.BNC_FUTURE.value, 'active': True}))[0]
+        cps = BinanceHandler(self.ccxt_provider).all_usdt_swap_symbols()
+
+        time_frame = cfg.time_frame
+
+        def mapper(item):
+            cfg = CrawlerItemConfig()
+            cfg.coin_pair = CoinPair.coin_pair_with(item)
+            cfg.time_frame = TimeFrame(time_frame)
+            cfg.exchange_name = self.ccxt_provider.display_name
+            cfg.coin_tail = '_swap'
+            return cfg
+        return list(map(mapper, cps))
 
     @property
     def ccxt_provider(self):

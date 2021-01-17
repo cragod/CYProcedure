@@ -74,61 +74,8 @@ def gen_select_df(_df, _c_rate, _select_num, _factor, _reverse):
 
     # 根据因子对比进行排名
     # 从小到大排序
-    df['condition_long'] = df['close'] >= df['lower']  # 破下轨，不做多
-    df['condition_short'] = df['close'] <= df['upper']  # 破上轨，不做空
-    df['排名1'] = df.groupby('candle_begin_time')['因子'].rank()
-    df1 = df[(df['排名1'] <= _select_num) & (df['condition_long'] == True)].copy()
-    df1['方向'] = 1
-
-    # 从大到小排序
-    df['排名2'] = df.groupby('candle_begin_time')['因子'].rank(ascending=False)
-    df2 = df[(df['排名2'] <= _select_num) & (df['condition_short'] == True)].copy()
-    df2['方向'] = -1
-
-    # 合并排序结果
-    df = pd.concat([df1, df2], ignore_index=True)
-    df.sort_values(by=['candle_begin_time', '方向'], inplace=True)
-    df['本周期涨跌幅'] = -(1 * _c_rate) + 1 * (
-        1 + (df['下个周期_avg_price'] / df['avg_price'] - 1) * df['方向']) * (1 - _c_rate) - 1
-
-    # 整理选中币种数据
-    df['symbol'] += ' '
-    select_c['做多币种'] = df[df['方向'] == 1].groupby('candle_begin_time')['symbol'].sum()
-    select_c['做空币种'] = df[df['方向'] == -1].groupby('candle_begin_time')['symbol'].sum()
-    select_c['本周期多空涨跌幅'] = df.groupby('candle_begin_time')['本周期涨跌幅'].mean()
-
-    # 计算整体资金曲线
-    select_c.reset_index(inplace=True)
-    select_c['资金曲线'] = (select_c['本周期多空涨跌幅'] + 1).cumprod()
-
-    return select_c
-
-
-def gen_select_df_for_set(_df, _c_rate, _select_num, _factor_set, _reverse):
-    """ 生成选币 DataFrame
-    :param _df:
-    :param _c_rate:
-    :param _select_num:
-    :param _factor_set:
-    :param _reverse:
-    :return: """
-    df = _df.copy()
-
-    _factor = '_add_'.join(_factor_set)  # 新的相加组合因子 名称
-    df[_factor] = df[_factor_set].sum(axis=1)  # 将组合因子横向相加 作为新列_factor的值
-
-    select_c = pd.DataFrame()
-    select_c['币数量'] = df.groupby('candle_begin_time').size()
-    # =选币
-    reverse_factor = -1 if _reverse else 1  # 是否反转因子
-    df['因子'] = reverse_factor * df[_factor]  # 选币因子
-    df = df.replace([np.inf, -np.inf], np.nan)  # 替换异常值并且删除
-    df.dropna(subset=[_factor], inplace=True)
-
-    # 根据因子对比进行排名
-    # 从小到大排序
-    df['condition_long'] = df['close'] >= df['lower']  # 破下轨，不做多
-    df['condition_short'] = df['close'] <= df['upper']  # 破上轨，不做空
+    df['condition_long'] = df['close_shift'] >= df['lower']  # 破下轨，不做多
+    df['condition_short'] = df['close_shift'] <= df['upper']  # 破上轨，不做空
     df['排名1'] = df.groupby('candle_begin_time')['因子'].rank()
     df1 = df[(df['排名1'] <= _select_num) & (df['condition_long'] == True)].copy()
     df1['方向'] = 1

@@ -1,4 +1,5 @@
 import math
+import pandas as pd
 from datetime import datetime
 from cy_widgets.exchange.provider import *
 from cy_widgets.trader.exchange_trader import *
@@ -150,3 +151,72 @@ class BinanceHandler:
             'cost': cost,
             'amount': filled
         }
+
+    def all_usdt_swap_symbols(self):
+        """ 永续USDT币对 """
+        cps = list(self.__ccxt_provider.ccxt_object_for_fetching.load_markets().keys())
+        cps = list(filter(lambda x: '/USDT' in x, cps))
+        return cps
+
+    def fetch_binance_swap_equity(self):
+        """
+        获取币安永续合约账户的当前净值
+        """
+        # 获取当前账户净值
+        balance = self.__ccxt_provider.ccxt_object_for_querexchangey.fapiPrivate_get_balance()  # 获取账户净值
+        balance = pd.DataFrame(balance)
+        equity = float(balance[balance['asset'] == 'USDT']['balance'])
+        return equity
+
+    def fetch_binance_ticker_data(self):
+        """
+        # 获取币安的ticker数据
+        使用ccxt的接口fapiPublic_get_ticker_24hr()获取ticker数据
+                        priceChange  priceChangePercent  weightedAvgPrice     lastPrice    lastQty  ...      openTime     closeTime      firstId       lastId      count
+        symbol                                                                                 ...
+        BTCUSDT     377.720000               3.517      10964.340000  11118.710000      0.039  ...  1.595927e+12  1.596013e+12  169966030.0  171208339.0  1242251.0
+        ETHUSDT       9.840000               3.131        316.970000    324.140000      4.380  ...  1.595927e+12  1.596013e+12   72997450.0   73586755.0   589302.0
+        ...
+        XLMUSDT       0.002720               2.838          0.096520      0.098570    203.000  ...  1.595927e+12  1.596013e+12   12193167.0   12314848.0   121682.0
+        ADAUSDT       0.002610               1.863          0.143840      0.142680   1056.000  ...  1.595927e+12  1.596013e+12   17919791.0   18260724.0   340914.0
+        XMRUSDT       2.420000               3.013         81.780000     82.740000      0.797  ...  1.595927e+12  1.596013e+12    4974234.0    5029877.0    55644.0
+        :param binance:
+        :return:
+        """
+        tickers = self.__ccxt_provider.ccxt_object_for_query.fapiPublic_get_ticker_24hr()
+        tickers = pd.DataFrame(tickers, dtype=float)
+        tickers.set_index('symbol', inplace=True)
+
+        return tickers['lastPrice']
+
+    def update_symbol_info(self, symbol_list):
+        """
+        # 获取币安账户的实际持仓
+        使用ccxt接口：fapiPrivate_get_positionrisk，获取账户持仓
+        返回值案例
+                    positionAmt  entryPrice  markPrice  unRealizedProfit  liquidationPrice  ...  maxNotionalValue  marginType isolatedMargin  isAutoAddMargin
+        positionSide
+        symbol                                                                            ...
+        XMRUSDT         0.003    63.86333  63.877630          0.000043             0.000  ...            250000       cross            0.0            false         LONG
+        ATOMUSDT       -0.030     2.61000   2.600252          0.000292           447.424  ...             25000       cross            0.0            false        SHORT
+        :param exchange:
+        :param symbol_list:
+        :return:
+        """
+        # 获取原始数据
+        position_risk = self.__ccxt_provider.ccxt_object_for_query.fapiPrivate_get_positionrisk()
+
+        # 将原始数据转化为dataframe
+        position_risk = pd.DataFrame(position_risk, dtype='float')
+
+        # 整理数据
+        position_risk.rename(columns={'positionAmt': '当前持仓量'}, inplace=True)
+        position_risk = position_risk[position_risk['当前持仓量'] != 0]  # 只保留有仓位的币种
+        position_risk.set_index('symbol', inplace=True)  # 将symbol设置为index
+
+        # 创建symbol_info
+        symbol_info = pd.DataFrame(index=symbol_list, columns=['当前持仓量'])
+        symbol_info['当前持仓量'] = position_risk['当前持仓量']
+        symbol_info['当前持仓量'].fillna(value=0, inplace=True)
+
+        return symbol_info

@@ -314,6 +314,9 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
     df['dn'] = df['z_score'].rolling(window=boll_n).min().shift(1)
     df['upper'] = df['median'] + df['std'] * df['up']
     df['lower'] = df['median'] - df['std'] * df['up']
+    df['upper'] = df['upper'].shift()
+    df['lower'] = df['lower'].shift()
+    df['close_shift'] = df['close'].shift()
 
     """ ******************** 以上是需要修改的代码 ******************** """
     # ===将数据转化为需要的周期
@@ -332,6 +335,7 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
         'open': 'first',
         'avg_price': 'first',
         'close': 'last',
+        'close_shift': 'last',
         '下个周期_avg_price': 'last',
         'volume': 'sum',
         'upper': 'first',

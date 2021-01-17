@@ -65,7 +65,7 @@ class CandleRealtimeCrawler:
                     continue
 
                 json_list = convert_df_to_json_list(df, COL_CANDLE_BEGIN_TIME)
-                candle_record_class_with_components(config.exchange_name, config.coin_pair, config.time_frame).bulk_upsert_records(json_list)
+                candle_record_class_with_components(config.exchange_name, config.coin_pair, config.time_frame, config.coin_tail).bulk_upsert_records(json_list)
                 return
             except Exception as e:
                 print('{} {} 出错'.format(config.coin_pair.formatted(), config.time_frame.value))
