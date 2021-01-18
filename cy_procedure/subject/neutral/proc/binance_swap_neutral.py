@@ -99,7 +99,7 @@ class BinanceSwapNeutral:
 
     def __update_trade_usdt_if_needed(self, run_time, last_trade_usdt):
         """更新到数据库"""
-        if (run_time - datetime(2000, 1, 1)).days % self._update_day_interval == 0 and run_time.hour == self._update_hour:
+        if (run_time - datetime(2000, 1, 1)).days % self._update_day_interval == 0 and datetime.now().hour == self._update_hour:
             print('开始更新trade_usdt')
             strategy_id = self._strategy_cfg.identifier
             strategy_position = StrategyPosition.position_with(strategy_id)
@@ -125,6 +125,7 @@ class BinanceSwapNeutral:
                 }
             # 保存到数据库
             strategy_position.strategy_info = info
+            strategy_position.save()
 
     def __cal_strategy_trade_usdt(self, trade_usdt_new, trade_usdt_old):
         """ 计算分配的资金 """
