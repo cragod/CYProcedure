@@ -305,19 +305,6 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
         # 差分
         __add_diff(_df=df, _d_list=diff_d, _name=f'量价相关系数_bh_{n}', _agg_dict=extra_agg_dict, _agg_type='first')
 
-    # 原版自适应布林通道
-    boll_n = 34
-    df['median'] = df['close'].rolling(window=boll_n).mean()
-    df['std'] = df['close'].rolling(boll_n, min_periods=1).std(ddof=0)  # ddof代表标准差自由度
-    df['z_score'] = abs(df['close'] - df['median']) / df['std']
-    df['up'] = df['z_score'].rolling(window=boll_n).max().shift(1)
-    df['dn'] = df['z_score'].rolling(window=boll_n).min().shift(1)
-    df['upper'] = df['median'] + df['std'] * df['up']
-    df['lower'] = df['median'] - df['std'] * df['up']
-    df['upper'] = df['upper'].shift()
-    df['lower'] = df['lower'].shift()
-    df['close_shift'] = df['close'].shift()
-
     """ ******************** 以上是需要修改的代码 ******************** """
     # ===将数据转化为需要的周期
     # 在数据最前面，增加一行数据，这是为了在对>24h的周期进行resample时，保持数据的一致性。
@@ -335,11 +322,8 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
         'open': 'first',
         'avg_price': 'first',
         'close': 'last',
-        'close_shift': 'last',
         '下个周期_avg_price': 'last',
         'volume': 'sum',
-        'upper': 'first',
-        'lower': 'first'
     }
     agg_dict = dict(agg_dict, **extra_agg_dict)  # 需要保留的列 必备字段 + 因子字段
 
@@ -372,6 +356,20 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
         # 添加 offset 标签列
         # 如果持币周为 2 offset 为 0, 1; 如果持币周为 3 offset 为 0, 1, 2;
         period_df['offset'] = offset
+
+        # 原版自适应布林通道
+        n = 34
+        period_df['close_shift'] = period_df['close'].shift(1)
+        period_df['median'] = period_df['close_shift'].rolling(window=n).mean()
+        period_df['std'] = period_df['close_shift'].rolling(n, min_periods=1).std(ddof=0)  # ddof代表标准差自由度
+        period_df['z_score'] = abs(period_df['close_shift'] - period_df['median']) / period_df['std']
+        period_df['up'] = period_df['z_score'].rolling(window=n, min_periods=1).max().shift(1)
+        period_df['dn'] = period_df['z_score'].rolling(window=n, min_periods=1).min().shift(1)
+        period_df['upper'] = period_df['median'] + period_df['std'] * period_df['up']
+        period_df['lower'] = period_df['median'] - period_df['std'] * period_df['up']
+        period_df['condition_long'] = period_df['close_shift'] >= period_df['lower']  # 破下轨，不做多
+        period_df['condition_short'] = period_df['close_shift'] <= period_df['upper']  # 破上轨，不做空
+
         period_df.reset_index(inplace=True)
 
         # 合并数据

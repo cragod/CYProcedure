@@ -1,6 +1,7 @@
 import math
 import pandas as pd
 from datetime import datetime
+from cy_components.utils.functions import *
 from cy_widgets.exchange.provider import *
 from cy_widgets.trader.exchange_trader import *
 
@@ -11,6 +12,8 @@ class BinanceHandler:
         self.__ccxt_provider = ccxt_provider
         self.__lending_products = None
         self.__fee_percent = 0  # 订单里已经把手续费扣掉返回了，不需要计算
+        self.__price_precision_info = None
+        self.__min_qty_info = None
 
     def fetch_all_lending_product(self):
         """所有活期产品"""
@@ -152,6 +155,19 @@ class BinanceHandler:
             'amount': filled
         }
 
+    def fetch_order_placing_cfg_if_needed(self):
+        """获取下单精度相关参数"""
+        if self.__min_qty_info is None or self.__price_precision_info is None:
+            exchange_info = self.__ccxt_provider.ccxt_object_for_query.fapiPublic_get_exchangeinfo()
+            # symbol_list = [x['symbol'] for x in exchange_info['symbols']]  # 获取所有可交易币种的list
+
+            # 从exchange_info中获取每个币种最小交易量
+            self.__min_qty_info = {x['symbol']: int(math.log(float(x['filters'][1]['minQty']), 0.1)) for x in exchange_info['symbols']}
+            # 案例：{'BTCUSDT': 3, 'ETHUSDT': 3, 'BCHUSDT': 3, 'XRPUSDT': 1, 'EOSUSDT': 1, 'LTCUSDT': 3, 'TRXUSDT': 0}
+
+            # 从exchange_info中获取每个币种下单精度
+            self.__price_precision_info = {x['symbol']: int(math.log(float(x['filters'][0]['minPrice']), 0.1)) for x in exchange_info['symbols']}
+
     def all_usdt_swap_symbols(self):
         """ 永续USDT币对 """
         cps = list(self.__ccxt_provider.ccxt_object_for_fetching.load_markets().keys())
@@ -163,7 +179,7 @@ class BinanceHandler:
         获取币安永续合约账户的当前净值
         """
         # 获取当前账户净值
-        balance = self.__ccxt_provider.ccxt_object_for_querexchangey.fapiPrivate_get_balance()  # 获取账户净值
+        balance = self.__ccxt_provider.ccxt_object_for_query.fapiPrivate_get_balance()  # 获取账户净值
         balance = pd.DataFrame(balance)
         equity = float(balance[balance['asset'] == 'USDT']['balance'])
         return equity
@@ -188,6 +204,37 @@ class BinanceHandler:
         tickers.set_index('symbol', inplace=True)
 
         return tickers['lastPrice']
+
+    def place_order(self, symbol_info, symbol_last_price):
+        """ 中性策略成批下单 """
+        self.fetch_order_placing_cfg_if_needed()
+        for symbol, row in symbol_info.dropna(subset=['实际下单量']).iterrows():
+            # 计算下单量：按照最小下单量向下取整
+            quantity = row['实际下单量']
+            quantity = float(f'{quantity:.{self.__min_qty_info[symbol]}f}')
+            quantity = abs(quantity)  # 下单量取正数
+            if quantity == 0:
+                print(symbol, quantity, '实际下单量为0，不下单')
+                continue
+
+            # 计算下单方向、价格
+            if row['实际下单量'] > 0:
+                side = 'BUY'
+                price = symbol_last_price[symbol] * 1.02
+            else:
+                side = 'SELL'
+                price = symbol_last_price[symbol] * 0.98
+
+            # 对下单价格这种最小下单精度
+            price = float(f'{price:.{self.__price_precision_info[symbol]}f}')
+
+            # 下单参数
+            params = {'symbol': symbol, 'side': side, 'type': 'LIMIT', 'price': price, 'quantity': quantity,
+                      'clientOrderId': str(time.time()), 'timeInForce': 'GTC'}
+            # 下单
+            print('下单参数：', params)
+            open_order, _ = retry_wrapper(self.__ccxt_provider.ccxt_object_for_order.fapiPrivate_post_order, params, sleep_seconds=5)
+            print('下单完成，下单信息：', open_order, '\n')
 
     def update_symbol_info(self, symbol_list):
         """
