@@ -246,19 +246,18 @@ class BinanceSwapNeutral:
                     symbol_holding_dict = symbol_holding_list[0]
                     str_list = ["{}: {}".format(x, symbol_holding_dict[x]) for x in symbol_holding_dict]
                     recorder.append_summary_log("**前次持仓**: \n{}".format('\n'.join(str_list)))
+                # ===== 等待下次执行 (固定1h)
+                next_run_time = TimeFrame('1h').next_date_time_point()
+                print('下次执行时间:', next_run_time)
+                self.__sleep_to_next_run_time(next_run_time)
+                time.sleep(5)  # TEST next_run_time = pd.to_datetime('2021-01-18 00:00:00').tz_localize(pytz.utc)
                 # ===== 计算旧的和新的策略分配资金
                 trade_usdt_old, trade_usdt_new = self.__cal_old_and_new_trade_usdt()
                 recorder.append_summary_log("**账户净值**: {} USDT".format(trade_usdt_new))
                 # ===== 计算每个策略分配的交易资金
                 strategy_trade_usdt = self.__cal_strategy_trade_usdt(trade_usdt_new, trade_usdt_old)
                 print(strategy_trade_usdt)
-                # ===== 等待下次执行 (固定1h)
-                next_run_time = TimeFrame('1h').next_date_time_point()
-                # 睡吧，等开工
-                self.__sleep_to_next_run_time(next_run_time)
-                # TEST next_run_time = pd.to_datetime('2021-01-18 00:00:00').tz_localize(pytz.utc)
-                print('下次执行时间:', next_run_time)
-                # ===== 开工了，取 K 线
+                # ===== 取 K 线
                 limit = self._strategy.candle_count_4_cal_factor
                 candle_df_dict = self.__fetch_all_candle(limit, next_run_time)
                 # 太少币种
