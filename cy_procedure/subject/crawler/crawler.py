@@ -18,10 +18,11 @@ class CandleRealtimeCrawler:
 
     __config_reader: CrawlerConfigReader
 
-    def __init__(self, config_reader, limit=10, duration=1):
+    def __init__(self, config_reader, limit=10, duration=1, tolerance=1):
         self.__config_reader = config_reader
         self.__limit = limit
         self.__duration = duration  # 两次间隔
+        self.__tolerance = tolerance  # 少几根不通过
 
     def __get_configs(self):
         """获取需要抓取的K线配置"""
@@ -52,9 +53,9 @@ class CandleRealtimeCrawler:
                 print(coin_pair.formatted(), df.shape[0], delta.total_seconds())
                 print(df[-1:])
                 if time_frame.value.endswith('m'):
-                    has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60
+                    has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60 * self.__tolerance
                 elif time_frame.value.endswith('h'):
-                    has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60 * 60
+                    has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60 * 60 * self.__tolerance
                 else:
                     print('time_interval不以m或者h结尾，出错，程序exit')
                     exit()
