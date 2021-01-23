@@ -196,6 +196,11 @@ class OKDeliveryBC(BaseBrickCarrier):
         target_pos = None
         symbol_signal = None
 
+        # 不够计算
+        if not strategy.available_to_calculate(df):
+            print(df.shape[0])
+            raise ValueError('K 线数量无法计算信号')
+
         # 根据策略计算出目标交易信号。
         if not df.empty:  # 当原始数据不为空的时候
             target_pos = strategy.calculate_realtime_signals(df, debug=self._debug, position_info=strategy_position.strategy_info, position_info_save_func=saver)
