@@ -1,4 +1,4 @@
 cy_components>=0.3.3
-cy_widgets>=0.4.7
+cy_widgets>=0.4.9
 cy_data_access>=0.4.12
 fracdiff==0.2.5
