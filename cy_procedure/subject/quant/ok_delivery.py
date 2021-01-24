@@ -52,7 +52,7 @@ class OKDeliveryBC(BaseBrickCarrier):
             else:
                 # 到时间的策略进入流程
                 to_run_strategie_ids = [s_id for s_id in all_next_time_infos.keys() if all_next_time_infos[s_id] == self.__next_run_time]
-            with Pool(processes=4) as pool:
+            with Pool(processes=2) as pool:
                 pool.map(self.single_strategy_procedure, to_run_strategie_ids)
             # 本次循环结束
             print('\n', '-' * 20, '本次循环结束，%f秒后进入下一次循环' % 10, '-' * 20, '\n\n')
