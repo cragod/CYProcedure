@@ -1,4 +1,5 @@
 import os
+import talib as ta
 import traceback
 import pandas as pd
 import numpy as np
@@ -304,6 +305,59 @@ def __prepare_one_hold(df, _back_hours, _hold_hour, diff_d=[0.3, 0.5]):
 
         # 差分
         __add_diff(_df=df, _d_list=diff_d, _name=f'量价相关系数_bh_{n}', _agg_dict=extra_agg_dict, _agg_type='first')
+
+    # --- Angle ---
+    for n in _back_hours:
+        column_name = f'Angle_bh_{n}'
+        ma = df['close'].rolling(window=n, min_periods=1).mean()
+        df[column_name] = ta.LINEARREG_ANGLE(ma, n)
+        df[column_name] = df[column_name].shift(1)
+        extra_agg_dict[column_name] = 'first'
+
+        # 差分
+        __add_diff(_df=df, _d_list=diff_d, _name=column_name, _agg_dict=extra_agg_dict, _agg_type='first')
+
+    # ---- GapTrue ----
+    for n in _back_hours:
+        ma = df['close'].rolling(window=n, min_periods=1).mean()
+        wma = ta.WMA(df['close'], n)
+        gap = wma - ma
+        column_name = f'GapTrue_bh_{n}'
+        df[column_name] = gap / abs(gap).rolling(window=n).sum()
+        df[column_name] = df[column_name].shift(1)
+        extra_agg_dict[column_name] = 'first'
+
+        # 差分
+        __add_diff(_df=df, _d_list=diff_d, _name=column_name, _agg_dict=extra_agg_dict, _agg_type='first')
+
+    # ---- 癞子 ----
+    for n in _back_hours:
+        diff = df['close'] / df['close'].shift(1) - 1
+        column_name = f'癞子_bh_{n}'
+        df[column_name] = diff / abs(diff).rolling(window=n).sum()
+        df[column_name] = df[column_name].shift(1)
+        extra_agg_dict[column_name] = 'first'
+
+        # 差分
+        __add_diff(_df=df, _d_list=diff_d, _name=column_name, _agg_dict=extra_agg_dict, _agg_type='first')
+
+    # ---- CCI ----
+    for n in _back_hours:
+        oma = ta.WMA(df.open, n)
+        hma = ta.WMA(df.high, n)
+        lma = ta.WMA(df.low, n)
+        cma = ta.WMA(df.close, n)
+        tp = (hma + lma + cma + oma) / 4
+        ma = ta.WMA(tp, n)
+        md = ta.WMA(abs(cma - ma), n)
+
+        column_name = f'CCI_bh_{n}'
+        df[column_name] = (tp - ma) / md
+        df[column_name] = df[column_name].shift(1)
+        extra_agg_dict[column_name] = 'first'
+
+        # 差分
+        __add_diff(_df=df, _d_list=diff_d, _name=column_name, _agg_dict=extra_agg_dict, _agg_type='first')
 
     """ ******************** 以上是需要修改的代码 ******************** """
     # ===将数据转化为需要的周期

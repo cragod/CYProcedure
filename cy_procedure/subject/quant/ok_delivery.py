@@ -199,7 +199,7 @@ class OKDeliveryBC(BaseBrickCarrier):
         # 不够计算
         if not strategy.available_to_calculate(df):
             print(df.shape[0])
-            raise ValueError('K 线数量无法计算信号')
+            raise ValueError(f'K 线数量无法计算信号, {strategy.candle_count_for_calculating}, {df.shape[0]}')
 
         # 根据策略计算出目标交易信号。
         if not df.empty:  # 当原始数据不为空的时候

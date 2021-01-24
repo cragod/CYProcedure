@@ -2,6 +2,7 @@ import pytz
 import time
 import traceback
 import json
+from random import randrange
 from datetime import datetime, timedelta
 from multiprocessing.pool import Pool
 from cy_components.defines.enums import *
@@ -225,7 +226,8 @@ class BinanceSwapNeutral:
 
         # 离现在超过2小时，不要了
         delta = candle_begin_time - df.iloc[-1].candle_begin_time.tz_convert(pytz.utc)
-        if delta.total_seconds() >= 60 * 60 * 3:
+        tolerance = 999 if self._debug else 3
+        if delta.total_seconds() >= 60 * 60 * tolerance:
             print(f'{symbol} 没有最近的K线, {delta.total_seconds()}')
             return None, None
 
@@ -250,7 +252,7 @@ class BinanceSwapNeutral:
                 next_run_time = TimeFrame('1h').next_date_time_point()
                 print('下次执行时间:', next_run_time)
                 self.__sleep_to_next_run_time(next_run_time)
-                time.sleep(5)  # TEST next_run_time = pd.to_datetime('2021-01-18 00:00:00').tz_localize(pytz.utc)
+                time.sleep(5 + randrange(5))  # TEST next_run_time = pd.to_datetime('2021-01-18 00:00:00').tz_localize(pytz.utc)
                 # ===== 计算旧的和新的策略分配资金
                 trade_usdt_old, trade_usdt_new = self.__cal_old_and_new_trade_usdt()
                 recorder.append_summary_log("**账户净值**: {} USDT".format(trade_usdt_new))
@@ -279,7 +281,8 @@ class BinanceSwapNeutral:
 
                 # ===== 逐个下单
                 symbol_last_price = self.__binance_handler.fetch_binance_ticker_data()  # 获取币种的最新价格
-                self.__binance_handler.place_order(symbol_info, symbol_last_price)  # 下单
+                if not self._debug:
+                    self.__binance_handler.place_order(symbol_info, symbol_last_price)  # 下单
                 time.sleep(self._short_sleep_time)  # 下单之后休息一段时间
                 # ===== 按需更新 Trade usdt
                 self.__update_trade_usdt_if_needed(next_run_time, trade_usdt_new)
