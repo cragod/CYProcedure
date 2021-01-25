@@ -213,6 +213,7 @@ class BinanceHandler:
             quantity = row['实际下单量']
             quantity = float(f'{quantity:.{self.__min_qty_info[symbol]}f}')
             quantity = abs(quantity)  # 下单量取正数
+
             if quantity == 0:
                 print(symbol, quantity, '实际下单量为0，不下单')
                 continue
@@ -227,6 +228,10 @@ class BinanceHandler:
 
             # 对下单价格这种最小下单精度
             price = float(f'{price:.{self.__price_precision_info[symbol]}f}')
+
+            if (quantity * price) < 1:
+                print(symbol, quantity, '实际下单量小于1u，不下单')
+                continue
 
             # 下单参数
             params = {'symbol': symbol, 'side': side, 'type': 'LIMIT', 'price': price, 'quantity': quantity,
