@@ -1,5 +1,6 @@
 import random
 import traceback
+import pytz
 from multiprocessing.pool import Pool
 from .base import *
 from ..exchange.okex import *
@@ -64,24 +65,32 @@ class OKDeliveryBC(BaseBrickCarrier):
             recorder = self._generate_recorder  # 拉一个记录员来记录搬砖现场
             cfg: StrategyCfg = list(filter(lambda x: x.identifier == strategy_id, self._strategy_cfgs))[0]
             strategy: BaseExchangeStrategy = self._strategy_from_cfg(cfg)
-            current_time = self.__next_run_time.astimezone()  # 用来过滤最近一根K线
+            current_time = self.__next_run_time.astimezone(tz=pytz.utc)  # 用来过滤最近一根K线
             recorder.append_summary_log("**{}-{}-{}**".format(cfg.strategy_name, cfg.coin_pair, cfg.identifier))
+            time.sleep(2)
             # 取K线
             while True:
+                time_frame = TimeFrame(cfg.time_interval)
                 candle_df = self._fetch_candle_for_strategy(ContractCoinPair.coin_pair_with(cfg.coin_pair, '-'),
-                                                            TimeFrame(cfg.time_interval),
+                                                            time_frame,
                                                             limit=strategy.candle_count_for_calculating)
                 # 用来计算信号的，把最新这根删掉
                 cal_signal_df = candle_df[candle_df.candle_begin_time < current_time]
-                if self._debug:
-                    break
-                # 剪掉最近的以后数量还一样，就是没最新了
-                elif cal_signal_df is None or cal_signal_df.empty or cal_signal_df.shape[0] == candle_df.shape[0]:
-                    if datetime.now() > self.__next_run_time + timedelta(minutes=1):
-                        raise ValueError('{} 时间超过3分钟，放弃，返回空数据'.format(cfg.coin_pair))
+                delta = current_time - cal_signal_df.iloc[-1].candle_begin_time.tz_convert(pytz.utc)
+                tolerance = 9 if self._debug else 2
+                if time_frame.value.endswith('m'):
+                    has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60 * tolerance
+                elif time_frame.value.endswith('h'):
+                    has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60 * 60 * tolerance
+                else:
+                    raise ValueError('time_interval不以m或者h结尾，出错，程序exit')
+                if not has_last:
+                    self._generate_recorder.record_exception('{} 最后 K 线时间: {}'.format(cfg.coin_pair, cal_signal_df.iloc[-1].candle_begin_time))
+                    if datetime.now() > self.__next_run_time + timedelta(minutes=2):
+                        raise ValueError('{} 时间超过2分钟，放弃，返回空数据'.format(cfg.coin_pair))
                     else:
                         print('{} 没有最新数据'.format(cfg.coin_pair), datetime.now())
-                        time.sleep(0.5)
+                        time.sleep(5)
                 else:
                     break
             # 策略信号
