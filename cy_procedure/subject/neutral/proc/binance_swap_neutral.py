@@ -136,8 +136,8 @@ class BinanceSwapNeutral:
 
         offset_num = int(hold_period[:-1])
         for offset in range(offset_num):
-            df.loc[f'{hold_period}_{offset}H', '策略分配资金_旧'] = trade_usdt_old * self._strategy.leverage / offset_num / selected_coin_num
-            df.loc[f'{hold_period}_{offset}H', '策略分配资金_新'] = trade_usdt_new * self._strategy.leverage / offset_num / selected_coin_num
+            df.loc[f'{hold_period}_{offset}H', '策略分配资金_旧'] = trade_usdt_old * self._strategy.leverage / 2 / offset_num / selected_coin_num
+            df.loc[f'{hold_period}_{offset}H', '策略分配资金_新'] = trade_usdt_new * self._strategy.leverage / 2 / offset_num / selected_coin_num
 
         df.reset_index(inplace=True)
         df.rename(columns={'index': 'key'}, inplace=True)
@@ -252,7 +252,7 @@ class BinanceSwapNeutral:
                 next_run_time = TimeFrame('1h').next_date_time_point()
                 print('下次执行时间:', next_run_time)
                 self.__sleep_to_next_run_time(next_run_time)
-                time.sleep(5 + randrange(5))  # TEST next_run_time = pd.to_datetime('2021-01-18 00:00:00').tz_localize(pytz.utc)
+                time.sleep(3 + randrange(3))  # TEST next_run_time = pd.to_datetime('2021-01-18 00:00:00').tz_localize(pytz.utc)
                 # ===== 计算旧的和新的策略分配资金
                 trade_usdt_old, trade_usdt_new = self.__cal_old_and_new_trade_usdt()
                 recorder.append_summary_log("**账户净值**: {} USDT".format(trade_usdt_new))
