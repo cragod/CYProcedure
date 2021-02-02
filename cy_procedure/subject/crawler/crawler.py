@@ -18,7 +18,7 @@ class CandleRealtimeCrawler:
 
     __config_reader: CrawlerConfigReader
 
-    def __init__(self, config_reader, limit=10, duration=1, tolerance=1):
+    def __init__(self, config_reader, limit=10, duration=1, tolerance=2):
         self.__config_reader = config_reader
         self.__limit = limit
         self.__duration = duration  # 两次间隔

@@ -23,7 +23,11 @@ def __read_df(coin_pair_str, time_interval_str):
     candle_collection_name = 'binance_{}_{}'.format(coin_pair_str.replace('/', '_').lower(), time_interval_str.lower())
     candle_cls = candle_record_class(candle_collection_name)
     try:
-        df = pd.DataFrame(list(candle_cls.objects.order_by([('_id', 1)]).all().values()))
+        df = pd.DataFrame(list(candle_cls.objects.raw({
+            '_id': {
+                '$gte': pd.to_datetime('2020-01-01').tz_localize(pytz.utc),
+            }
+        }).order_by([('_id', 1)]).all().values()))
         # Tidy candle
         if df is not None:
             ph.tidy_candle_from_database(df)
@@ -467,7 +471,7 @@ os.environ['NUMEXPR_MAX_THREADS'] = "8"
 
 def plot_main(factor_set, output_path, _fgsz=(10, 5), ind1=None, ind2=None, ind3=None, ind4=None, ind5=None, ind6=None, select_c=None):
     """画图
-    factor_set: ['3H', 'bias_bh...', offset]
+    factor_set: ['3H', 'bias_bh...', offset, reverse]
     """
     title = f"Factor:{factor_set[1]}  Hold Period:{factor_set[0]}  offset:{factor_set[2]}"
     title += f"\nEquity Curve:{ind1}  Max Drawdown:{ind2}  Win Rate:{ind3}"
@@ -480,7 +484,7 @@ def plot_main(factor_set, output_path, _fgsz=(10, 5), ind1=None, ind2=None, ind3
     plt.legend(loc='best')
     plt.grid(True, linestyle='-.', dashes=(5, 5), linewidth=0.5)
     plt.subplots_adjust(left=0.06, right=0.98, bottom=0.07, top=0.86)
-    pic_file1 = f'{output_path}/{factor_set[0]}_{factor_set[1]}_[{factor_set[2]}]_offset{factor_set[3]}_curve.png'
+    pic_file1 = f'{output_path}/{factor_set[0]}_{factor_set[1]}_[{factor_set[3]}]_offset{factor_set[2]}_curve.png'
     plt.savefig(pic_file1), plt.close('all')
 
     plt.figure(figsize=_fgsz)
@@ -489,14 +493,14 @@ def plot_main(factor_set, output_path, _fgsz=(10, 5), ind1=None, ind2=None, ind3
     plt.legend(loc='best')
     plt.grid(True, linestyle='-.', dashes=(5, 5), linewidth=0.5)
     plt.subplots_adjust(left=0.06, right=0.98, bottom=0.07, top=0.86)
-    pic_file2 = f'{output_path}/{factor_set[0]}_{factor_set[1]}_[{factor_set[2]}]_offset{factor_set[3]}_curve2.png'
+    pic_file2 = f'{output_path}/{factor_set[0]}_{factor_set[1]}_[{factor_set[3]}]_offset{factor_set[2]}_curve2.png'
     plt.savefig(pic_file2), plt.close('all')
 
     # ===合并图像并显示
     pic1 = np.array(Image.open(pic_file1))
     pic2 = np.array(Image.open(pic_file2))
     pic = np.concatenate((pic1, pic2), axis=0)
-    pic_file = f'{output_path}/{factor_set[0]}_{factor_set[1]}_[{factor_set[2]}]_offset{factor_set[3]}_cl.png'
+    pic_file = f'{output_path}/{factor_set[0]}_{factor_set[1]}_[{factor_set[3]}]_offset{factor_set[2]}_cl.png'
     plt.imsave(pic_file, arr=pic, format='png'), plt.close('all')
     os.system(f'chrome {pic_file}')
     os.remove(pic_file1)
