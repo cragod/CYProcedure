@@ -56,13 +56,17 @@ class BinanceSwapNeutral:
         self._strategy: NeutralStrategyBase = eval(strategy_name).strategy_with_parameters(parameters)
 
         # 币对
-        self.__symbol_list_with_sep = self.__binance_handler.all_usdt_swap_symbols()
-        self.__symbol_list = list(map(lambda x: x.replace("/", ''), self.__symbol_list_with_sep))
+        self.__fetch_symbol_list()
 
     @property
     def _generate_recorder(self):
         return PersistenceRecorder(self.__wechat_token, MessageType.WeChatWork, self.__log_type)
         # return ProcedureRecorder(self.__wechat_token, MessageType.WeChatWork)
+
+    def __fetch_symbol_list(self):
+        # 更新一次 Symbols
+        self.__symbol_list_with_sep = self.__binance_handler.all_usdt_swap_symbols()
+        self.__symbol_list = list(map(lambda x: x.replace("/", ''), self.__symbol_list_with_sep))
 
     def __cal_old_and_new_trade_usdt(self):
         """ 每隔一段时间修改一下trade_usdt """
@@ -288,6 +292,8 @@ class BinanceSwapNeutral:
                 self.__update_trade_usdt_if_needed(next_run_time, trade_usdt_new)
 
                 recorder.record_summary_log()
+                # ===== 更新一次 Symbols ======
+                self.__fetch_symbol_list()
                 print('\n', '-' * 20, '本次循环结束，%f秒后进入下一次循环' % self._long_sleep_time, '-' * 20, '\n\n')
                 time.sleep(self._long_sleep_time)
             except Exception as _:
