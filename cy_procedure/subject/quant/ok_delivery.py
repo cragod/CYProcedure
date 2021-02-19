@@ -107,7 +107,19 @@ class OKDeliveryBC(BaseBrickCarrier):
                 equity = self.__symbol_info_df.at[cfg.coin_pair, "账户权益"]
                 leverage = min(float(cfg.leverage), float(self.__symbol_info_df.at[cfg.coin_pair, "最大杠杆"]))
                 # 下单逻辑
-                order_ids = self.__ok_handler.okex_future_place_order(self.__symbol_index_reverse_mapping[cfg.coin_pair], cfg.coin_pair, signals, signal_price, holding, equity, leverage)
+                retry_times = 10
+                while True:
+                    try:
+                        order_ids = self.__ok_handler.okex_future_place_order(self.__symbol_index_reverse_mapping[cfg.coin_pair], cfg.coin_pair, signals, signal_price, holding, equity, leverage)
+                        break
+                    except Exception as e:
+                        if retry_times <= 0:
+                            raise ValueError(f'尝试下单次数真的太多了，退出({cfg.coin_pair}, {signals})')
+                        else:
+                            self._generate_recorder.record_exception(f'下单失败，稍后重试({cfg.coin_pair}, {signals})')
+                            retry_times -= 1
+                            time.sleep(30)
+
                 print('{} 下单记录：\n'.format(cfg.coin_pair), order_ids)
                 # 更新订单信息，查看是否完全成交
                 time.sleep(self._short_sleep_time)  # 休息一段时间再更新订单信息
