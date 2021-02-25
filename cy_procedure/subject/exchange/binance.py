@@ -229,8 +229,8 @@ class BinanceHandler:
             # 对下单价格这种最小下单精度
             price = float(f'{price:.{self.__price_precision_info[symbol]}f}')
 
-            if (quantity * price) < 1:
-                print(symbol, quantity, '实际下单量小于1u，不下单')
+            if (quantity * price) < 5:
+                print(symbol, quantity, '实际下单量小于5u，不下单')
                 continue
 
             # 下单参数
