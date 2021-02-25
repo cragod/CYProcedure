@@ -238,8 +238,11 @@ class BinanceHandler:
                       'clientOrderId': str(time.time()), 'timeInForce': 'GTC'}
             # 下单
             print('下单参数：', params)
-            open_order, _ = retry_wrapper(self.__ccxt_provider.ccxt_object_for_order.fapiPrivate_post_order, params, sleep_seconds=5)
-            print('下单完成，下单信息：', open_order, '\n')
+            try:
+                open_order, _ = retry_wrapper(self.__ccxt_provider.ccxt_object_for_order.fapiPrivate_post_order, params, sleep_seconds=5)
+                print('下单完成，下单信息：', open_order, '\n')
+            except Exception as e:
+                print('下单失败', str(e))
 
     def update_symbol_info(self, symbol_list):
         """
