@@ -1,5 +1,6 @@
 import math
 import pandas as pd
+import numpy as np
 from datetime import datetime
 from cy_components.utils.functions import *
 from cy_widgets.exchange.provider import *
@@ -212,6 +213,9 @@ class BinanceHandler:
             # 计算下单量：按照最小下单量向下取整
             quantity = row['实际下单量']
             quantity = float(f'{quantity:.{self.__min_qty_info[symbol]}f}')
+
+            # 检测是否需要开启只减仓
+            reduce_only = np.isnan(row['目标下单份数']) or row['目标下单份数'] * quantity < 0
             quantity = abs(quantity)  # 下单量取正数
 
             if quantity == 0:
@@ -229,13 +233,13 @@ class BinanceHandler:
             # 对下单价格这种最小下单精度
             price = float(f'{price:.{self.__price_precision_info[symbol]}f}')
 
-            if (quantity * price) < 5:
+            if (quantity * price) < 5 and not reduce_only:
                 print(symbol, quantity, '实际下单量小于5u，不下单')
                 continue
 
             # 下单参数
             params = {'symbol': symbol, 'side': side, 'type': 'LIMIT', 'price': price, 'quantity': quantity,
-                      'clientOrderId': str(time.time()), 'timeInForce': 'GTC'}
+                      'clientOrderId': str(time.time()), 'timeInForce': 'GTC', 'reduceOnly': reduce_only}
             # 下单
             print('下单参数：', params)
             try:
