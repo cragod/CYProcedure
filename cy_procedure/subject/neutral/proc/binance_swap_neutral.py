@@ -283,7 +283,7 @@ class BinanceSwapNeutral:
                     self.__binance_handler.place_order(symbol_info, symbol_last_price)  # 下单
                 # ===== 最后一次选币保存
                 select_coin_df = select_coin_df[['key', 's_time', 'e_time', 'symbol', '方向', '策略分配资金', '目标下单量']]
-                grouped_df = select_coin_df.groupby('key')
+                grouped_df = select_coin_df.groupby('s_time')
                 last_selection_df = list(grouped_df)[-1][1]
                 last_selection_df['strategy'] = self._strategy.display_name
                 connect_db_and_save_json_list(DB_POSITION, CN_NEUTRAL_SELECTION, convert_simple_df_to_json_list(last_selection_df), False)
