@@ -1,7 +1,7 @@
 from datetime import datetime
 from cy_components.helpers.formatter import DateFormatter
 from cy_components.utils.notifier import MessageHandler, MessageType
-from cy_widgets.logger.base import RecorderBase
+from cy_widgets.logger.base import *
 from cy_data_access.models.log import *
 
 
