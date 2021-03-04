@@ -259,8 +259,6 @@ class BinanceSwapNeutral:
                 print('下次执行时间:', next_run_time)
                 self.__sleep_to_next_run_time(next_run_time)
                 time.sleep(3 + randrange(3))  # TEST next_run_time = pd.to_datetime('2021-01-18 00:00:00').tz_localize(pytz.utc)
-                # ===== 记录选币时间
-                recorder.append_summary_log(f"**选币时间**: {datetime.now()}")
                 # ===== 计算旧的和新的策略分配资金
                 trade_usdt_old, trade_usdt_new = self.__cal_old_and_new_trade_usdt()
                 recorder.append_summary_log("**账户净值**: {} USDT".format(trade_usdt_new))
@@ -279,22 +277,23 @@ class BinanceSwapNeutral:
                 select_coin_factor_df = self._strategy.cal_factor_and_select_coins(candle_df_dict, next_run_time)
                 # ===== 计算选中币种的实际下单量
                 symbol_info, select_coin_df = self.__cal_order_amount(symbol_info, select_coin_factor_df, strategy_trade_usdt, next_run_time)
+                # ===== 逐个下单
+                symbol_last_price = self.__binance_handler.fetch_binance_ticker_data()  # 获取币种的最新价格
+                if not self._debug:
+                    self.__binance_handler.place_order(symbol_info, symbol_last_price)  # 下单
                 # ===== 最后一次选币保存
                 select_coin_df = select_coin_df[['key', 's_time', 'e_time', 'symbol', '方向', '策略分配资金', '目标下单量']]
                 grouped_df = select_coin_df.groupby('key')
                 last_selection_df = list(grouped_df)[-1][1]
                 last_selection_df['strategy'] = self._strategy.display_name
                 connect_db_and_save_json_list(DB_POSITION, CN_NEUTRAL_SELECTION, convert_simple_df_to_json_list(last_selection_df), False)
-                # ===== 逐个下单
-                symbol_last_price = self.__binance_handler.fetch_binance_ticker_data()  # 获取币种的最新价格
-                if not self._debug:
-                    self.__binance_handler.place_order(symbol_info, symbol_last_price)  # 下单
                 # ===== 推送本次选币结果
                 s = last_selection_df['symbol']
                 p = last_selection_df['方向']
                 a = last_selection_df['目标下单量']
                 l = list(zip(s, p, a))
                 recorder.append_summary_log("**本次选币**: \n{}".format('\n'.join([f'{x[0]}: {x[1]} ({x[2]})' for x in l])))
+                recorder.append_summary_log(f"**选币时间**: {datetime.now()}")  # 记录选币时间
                 # ===== 按需更新 Trade usdt
                 time.sleep(self._short_sleep_time)  # 下单之后休息一段时间
                 self.__update_trade_usdt_if_needed(next_run_time, trade_usdt_new)
