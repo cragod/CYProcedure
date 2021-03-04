@@ -12,6 +12,7 @@ from cy_data_access.models.quant import *
 from cy_data_access.models.config import *
 from cy_data_access.models.market import *
 from cy_data_access.models.position import *
+from cy_data_access.util.convert import *
 from ...exchange.binance import *
 from ....util.helper import ProcedureHelper as ph
 from ....util.logger import *
@@ -60,8 +61,10 @@ class BinanceSwapNeutral:
 
     @property
     def _generate_recorder(self):
-        return PersistenceRecorder(self.__wechat_token, MessageType.WeChatWork, self.__log_type)
-        # return ProcedureRecorder(self.__wechat_token, MessageType.WeChatWork)
+        if self._debug:
+            return SimpleRecorder()
+        else:
+            return PersistenceRecorder(self.__wechat_token, MessageType.WeChatWork, self.__log_type)
 
     def __fetch_symbol_list(self):
         # 更新一次 Symbols
@@ -164,10 +167,9 @@ class BinanceSwapNeutral:
         symbol_info['目标下单量'].fillna(value=0, inplace=True)
         symbol_info['目标下单份数'] = select_coin.groupby('symbol')[['方向']].sum()
         symbol_info['实际下单量'] = symbol_info['目标下单量'] - symbol_info['当前持仓量']
-        # print(symbol_info)
         # 删除实际下单量为0的币种
         symbol_info = symbol_info[symbol_info['实际下单量'] != 0]
-        return symbol_info
+        return symbol_info, select_coin
 
     def __sleep_to_next_run_time(self, next_run_time):
         """等到下一次"""
@@ -245,13 +247,14 @@ class BinanceSwapNeutral:
             try:
                 recorder = self._generate_recorder
                 recorder.append_summary_log("**{}**".format(self._strategy.display_name))
+                recorder.append_summary_log(f"**选币时间**: {datetime.now()}")
                 # ===== 获取账户的实际持仓
                 symbol_info = self.__binance_handler.update_symbol_info(self.__symbol_list)
                 symbol_holding_list = list(json.loads(symbol_info[symbol_info['当前持仓量'] != 0].to_json()).values())
                 if len(symbol_holding_list) > 0:
                     symbol_holding_dict = symbol_holding_list[0]
                     str_list = ["{}: {}".format(x, symbol_holding_dict[x]) for x in symbol_holding_dict]
-                    recorder.append_summary_log("**前次持仓**: \n{}".format('\n'.join(str_list)))
+                    recorder.append_summary_log("**当前持仓**: \n{}".format('\n'.join(str_list)))
                 # ===== 等待下次执行 (固定1h)
                 next_run_time = TimeFrame('1h').next_date_time_point()
                 print('下次执行时间:', next_run_time)
@@ -274,21 +277,25 @@ class BinanceSwapNeutral:
                 # ===== 选币
                 select_coin_factor_df = self._strategy.cal_factor_and_select_coins(candle_df_dict, next_run_time)
                 # ===== 计算选中币种的实际下单量
-                symbol_info = self.__cal_order_amount(symbol_info, select_coin_factor_df, strategy_trade_usdt, next_run_time)
-                try:
-                    symbol_amount_dict = json.loads(symbol_info[symbol_info['实际下单量'] != 0].to_json())['实际下单量']
-                    symbol_amount_dict = {k: v for k, v in sorted(symbol_amount_dict.items(), key=lambda item: item[1])}
-                    str_list = ["{}: {}".format(x, round(symbol_amount_dict[x], 5)) for x in symbol_amount_dict]
-                    recorder.append_summary_log("**本次仓位更新**: \n{}".format('\n'.join(str_list)))
-                except Exception as _:
-                    print(traceback.format_exc())
-
+                symbol_info, select_coin_df = self.__cal_order_amount(symbol_info, select_coin_factor_df, strategy_trade_usdt, next_run_time)
+                # ===== 最后一次选币保存
+                select_coin_df = select_coin_df[['key', 's_time', 'e_time', 'symbol', '方向', '策略分配资金', '目标下单量']]
+                grouped_df = select_coin_df.groupby('key')
+                last_selection_df = list(grouped_df)[-1][1]
+                last_selection_df['strategy'] = self._strategy.display_name
+                connect_db_and_save_json_list(DB_POSITION, CN_NEUTRAL_SELECTION, convert_simple_df_to_json_list(last_selection_df), False)
                 # ===== 逐个下单
                 symbol_last_price = self.__binance_handler.fetch_binance_ticker_data()  # 获取币种的最新价格
                 if not self._debug:
                     self.__binance_handler.place_order(symbol_info, symbol_last_price)  # 下单
-                time.sleep(self._short_sleep_time)  # 下单之后休息一段时间
+                # ===== 推送本次选币结果
+                s = last_selection_df['symbol']
+                p = last_selection_df['方向']
+                a = last_selection_df['目标下单量']
+                l = list(zip(s, p, a))
+                recorder.append_summary_log("**本次选币**: \n{}".format('\n'.join([f'{x[0]}: {x[1]} ({x[2]})' for x in l])))
                 # ===== 按需更新 Trade usdt
+                time.sleep(self._short_sleep_time)  # 下单之后休息一段时间
                 self.__update_trade_usdt_if_needed(next_run_time, trade_usdt_new)
 
                 recorder.record_summary_log()

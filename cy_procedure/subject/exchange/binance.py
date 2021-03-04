@@ -279,3 +279,9 @@ class BinanceHandler:
         symbol_info['当前持仓量'].fillna(value=0, inplace=True)
 
         return symbol_info
+
+    # === 子账户相关 ===
+
+    def all_sub_class_emails(self):
+        """子账户邮箱列表"""
+        return [x['email'] for x in self.__ccxt_provider.ccxt_object_for_query.wapiGetSubAccountList()['subAccounts']]
