@@ -54,7 +54,7 @@ class BinanceSwapNeutral:
         strategy_name = self._strategy_cfg.strategy_name
         parameters = self._strategy_cfg.parameters
 
-        self._strategy: NeutralStrategyBase = eval(strategy_name).strategy_with_parameters(parameters)
+        self._strategy: NeutralStrategyBase = eval(strategy_name)(parameters)
 
         # 币对
         self.__fetch_symbol_list()
