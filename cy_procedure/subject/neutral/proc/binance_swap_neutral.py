@@ -208,6 +208,12 @@ class BinanceSwapNeutral:
                 '_id': -1
             }
         }, {
+            '$match': {
+                'volume': {
+                    '$gt': 0
+                }
+            }
+        }, {
             "$limit": limit + 10
         }, {
             '$sort': {
@@ -295,7 +301,7 @@ class BinanceSwapNeutral:
                 p = last_selection_df['方向']
                 a = last_selection_df['目标下单量']
                 l = list(zip(s, p, a))
-                recorder.append_summary_log("**本次选币**: \n{}".format('\n'.join([f'{x[0]}: {x[1]} ({x[2]})' for x in l])))
+                recorder.append_summary_log("**本次选币**: \n{}".format('\n'.join([f'{x[0]}: {x[1]} ({round(x[2], 4)})' for x in l])))
                 recorder.append_summary_log(f"**选币时间**: {datetime.now()}")  # 记录选币时间
                 # ===== 按需更新 Trade usdt
                 time.sleep(self._short_sleep_time)  # 下单之后休息一段时间
