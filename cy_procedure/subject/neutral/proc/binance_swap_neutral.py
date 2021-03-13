@@ -17,6 +17,8 @@ from ...exchange.binance import *
 from ....util.helper import ProcedureHelper as ph
 from ....util.logger import *
 
+pd.options.display.max_columns = None
+
 
 class BinanceSwapNeutral:
 
@@ -286,7 +288,8 @@ class BinanceSwapNeutral:
                 grouped_df = select_coin_df.groupby('s_time')
                 last_selection_df = list(grouped_df)[-1][1]
                 last_selection_df['strategy'] = self._strategy.display_name
-                connect_db_and_save_json_list(DB_POSITION, CN_NEUTRAL_SELECTION, convert_simple_df_to_json_list(last_selection_df), False)
+                if not self._debug:
+                    connect_db_and_save_json_list(DB_POSITION, CN_NEUTRAL_SELECTION, convert_simple_df_to_json_list(last_selection_df), False)
                 # ===== 推送本次选币结果
                 s = last_selection_df['symbol']
                 p = last_selection_df['方向']
