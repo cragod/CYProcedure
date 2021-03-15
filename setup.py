@@ -50,6 +50,6 @@ setup(
     test_suite='tests',
     tests_require=test_requirements,
     url='https://github.com/cragod/CYProcedure',
-    version='0.5.24',
+    version='0.5.25',
     zip_safe=False,
 )
