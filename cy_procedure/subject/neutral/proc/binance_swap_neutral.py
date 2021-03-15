@@ -273,22 +273,36 @@ class BinanceSwapNeutral:
                 # ===== 计算每个策略分配的交易资金
                 strategy_trade_usdt = self.__cal_strategy_trade_usdt(trade_usdt_new, trade_usdt_old)
                 print(strategy_trade_usdt)
-                # ===== 取 K 线
-                limit = self._strategy.candle_count_4_cal_factor
-                candle_df_dict = self.__fetch_all_candle(limit, next_run_time)
-                # 太少币种
-                if len(candle_df_dict) < 10:
-                    self._generate_recorder.record_exception(f'可选的币太少了，{len(candle_df_dict)}')
-                    time.sleep(self._long_sleep_time)
-                    continue
-                # ===== 选币
-                select_coin_factor_df = self._strategy.cal_factor_and_select_coins(candle_df_dict, next_run_time)
-                # ===== 计算选中币种的实际下单量
-                symbol_info, select_coin_df = self.__cal_order_amount(symbol_info, select_coin_factor_df, strategy_trade_usdt, next_run_time)
-                # ===== 逐个下单
-                symbol_last_price = self.__binance_handler.fetch_binance_ticker_data()  # 获取币种的最新价格
-                if not self._debug:
-                    self.__binance_handler.place_order(symbol_info, symbol_last_price)  # 下单
+                retry_times = 60
+                # 核心逻辑添加重试机制
+                while True:
+                    try:
+                        # ===== 取 K 线
+                        limit = self._strategy.candle_count_4_cal_factor
+                        candle_df_dict = self.__fetch_all_candle(limit, next_run_time)
+                        # 太少币种
+                        if len(candle_df_dict) < 10:
+                            self._generate_recorder.record_exception(f'可选的币太少了，{len(candle_df_dict)}')
+                            time.sleep(self._long_sleep_time)
+                            continue
+                        # ===== 选币
+                        select_coin_factor_df = self._strategy.cal_factor_and_select_coins(candle_df_dict, next_run_time)
+                        # ===== 计算选中币种的实际下单量
+                        symbol_info, select_coin_df = self.__cal_order_amount(symbol_info, select_coin_factor_df, strategy_trade_usdt, next_run_time)
+                        # ===== 逐个下单
+                        symbol_last_price = self.__binance_handler.fetch_binance_ticker_data()  # 获取币种的最新价格
+                        if not self._debug:
+                            self.__binance_handler.place_order(symbol_info, symbol_last_price)  # 下单
+                        break
+                    except Exception as _:
+                        self._generate_recorder.record_exception(self._strategy.display_name + traceback.format_exc())
+                        if retry_times > 0:
+                            retry_times -= 1
+                            time.sleep(15)
+                        else:
+                            self._generate_recorder.record_exception(self._strategy.display_name + ' 失败太多次，本周期放弃')
+                            break
+
                 # ===== 最后一次选币保存
                 select_coin_df = select_coin_df[['key', 's_time', 'e_time', 'symbol', '方向', '策略分配资金', '目标下单量']]
                 grouped_df = select_coin_df.groupby('s_time')
@@ -306,7 +320,7 @@ class BinanceSwapNeutral:
                 # ===== 按需更新 Trade usdt
                 time.sleep(self._short_sleep_time)  # 下单之后休息一段时间
                 self.__update_trade_usdt_if_needed(next_run_time, trade_usdt_new)
-
+                # ===== 推送通知
                 recorder.record_summary_log()
                 # ===== 更新一次 Symbols ======
                 self.__fetch_symbol_list()
