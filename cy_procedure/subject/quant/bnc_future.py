@@ -92,24 +92,23 @@ class BinanceUFutureBC(BaseBrickCarrier):
             signals = self.__calculate_signal(strategy, cal_signal_df, coin_pair_str, strategy_id=strategy_id)
             recorder.append_summary_log("**信号**: {}".format(signals))
             # 假信号逻辑
-            if self._debug:
+            if self._debug_order_proc:
                 signals = self.__real_signal_random(coin_pair_str)
             print('{} 信号'.format(cfg.coin_pair), signals)
             # 策略下单
             order_infos = None
-            if signals and not self._debug:  # 测试模式下不进
+            if signals and (not self._debug or self._debug_order_proc):  # 测试模式下不进
                 signal_price = candle_df.iloc[-1].close  # 最后一根K线的收盘价作为信号价
-                holding = self.__symbol_info_df.at[coin_pair_str, "持仓量"]
+                holding = self.__symbol_info_df.at[coin_pair_str, "当前持仓量"]
                 equity = self.__symbol_info_df.at[coin_pair_str, "账户权益"]
                 leverage = min(float(cfg.leverage), float(20))
-                # 下单逻辑 TODO
+                # 下单逻辑
                 order_ids = None
-                # order_ids = self.__ok_handler.okex_future_place_order(self.__symbol_index_reverse_mapping[cfg.coin_pair], cfg.coin_pair, signals, signal_price, holding, equity, leverage)
+                order_ids = self.__binance_handler.binance_future_place_order(coin_pair_str, signals, signal_price, holding, equity, leverage)
                 print('{} 下单记录：\n'.format(cfg.coin_pair), order_ids)
                 # 更新订单信息，查看是否完全成交
                 time.sleep(self._short_sleep_time)  # 休息一段时间再更新订单信息
-                # TODO:
-                # order_infos = self.__ok_handler.update_future_order_info(cfg.coin_pair, order_ids)
+                order_infos = self.__binance_handler.update_future_order_info(coin_pair_str, order_ids)
                 print('更新下单记录：', '\n', order_infos)
             # 订单保存
             if order_infos is not None:
@@ -134,7 +133,7 @@ class BinanceUFutureBC(BaseBrickCarrier):
                 recorder.append_summary_log("**持仓方向**: {}".format(info_dict['持仓方向']))
                 if info_dict['持仓方向'] != 0:
                     # 非空仓，记录其他的
-                    key_names = ['持仓量', '持仓收益率', '持仓收益', '持仓均价', '当前价格']
+                    key_names = ['当前持仓量', '持仓收益', '持仓均价', '当前价格']
                     for name in key_names:
                         recorder.append_summary_log("**{}**: {}".format(name, info_dict[name]))
             recorder.record_summary_log("{}".format(datetime.now()))
