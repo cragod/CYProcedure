@@ -31,9 +31,8 @@ class DBHistoricalSpotCandle:
             procedure.run_task()
         except Exception as e:
             print("Fetche Failed", e)
-            if retry > 0:
-                time.sleep(3)
-                self.run_task(retry - 1)
+            time.sleep(3)
+            self.run_task(retry - 1)
 
     def __get_latest_date(self):
         print("lastest date: {}".format(self.start_date))

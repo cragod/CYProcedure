@@ -17,9 +17,10 @@ class BaseBrickCarrier(ABC):
     _short_sleep_time = 1
     _sleep_when_debug = False  # debug 模式下默认不睡
 
-    def __init__(self, bc_cfg: BrickCarrierCfg, wechat_token, log_type, debug=False):
+    def __init__(self, bc_cfg: BrickCarrierCfg, wechat_token, log_type, debug=False, debug_order_proc=False):
         # 整体配置
         self._debug = debug
+        self._debug_order_proc = debug_order_proc
         self._bc_cfg = bc_cfg
         self.__wechat_token = wechat_token
         self.__log_type = log_type
@@ -64,9 +65,9 @@ class BaseBrickCarrier(ABC):
         strategy: BaseExchangeStrategy = eval(strategy_cfg.strategy_name).strategy_with(strategy_cfg.parameters)
         return strategy
 
-    def _fetch_candle_for_strategy(self, coin_pair: CoinPair, time_frame: TimeFrame, limit):
+    def _fetch_candle_for_strategy(self, coin_pair: CoinPair, time_frame: TimeFrame, limit, tail=''):
         """取策略需要用的K线"""
-        candle_cls = candle_record_class_with_components(self._ccxt_provider.ccxt_object_for_fetching.name, coin_pair, time_frame)
+        candle_cls = candle_record_class_with_components(self._ccxt_provider.ccxt_object_for_fetching.name, coin_pair, time_frame, tail)
         # 取最后的 limit 条
         pipeline = [{
             '$sort': {
