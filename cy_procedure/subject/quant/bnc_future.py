@@ -92,7 +92,8 @@ class BinanceUFutureBC(BaseBrickCarrier):
             signals = self.__calculate_signal(strategy, cal_signal_df, coin_pair_str, strategy_id=strategy_id)
             recorder.append_summary_log("**信号**: {}".format(signals))
             # 假信号逻辑
-            # signals = self.__real_signal_random(cfg.coin_pair)
+            if self._debug:
+                signals = self.__real_signal_random(coin_pair_str)
             print('{} 信号'.format(cfg.coin_pair), signals)
             # 策略下单
             order_infos = None
