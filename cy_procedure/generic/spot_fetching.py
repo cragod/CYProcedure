@@ -79,14 +79,17 @@ class ExchangeFetchingProcedure:
     def __perform_fetching(self, since_ts):
         """fetching + saving"""
         # Fetch
-        df = self.fetcher.fetch_historical_candle_data(
-            self.configuration.coin_pair,
-            self.configuration.time_frame,
-            since_ts,
-            self.configuration.batch_limit)
-        return self.save_df(df)
-
-    # Task
+        while True:
+            try:
+                df = self.fetcher.fetch_historical_candle_data(
+                    self.configuration.coin_pair,
+                    self.configuration.time_frame,
+                    since_ts,
+                    self.configuration.batch_limit)
+                return self.save_df(df)
+            except Exception as e:
+                print(f'{self.configuration.coin_pair.formatted()}, {since_ts} failed.', str(e))
+                time.sleep(1.5)
 
     def __fetch_historical_data(self):
         """获取历史记录"""

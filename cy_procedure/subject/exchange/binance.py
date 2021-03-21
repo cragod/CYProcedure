@@ -248,7 +248,7 @@ class BinanceHandler:
             except Exception as e:
                 print('下单失败', str(e))
 
-    def update_symbol_info(self, symbol_list):
+    def update_symbol_info(self, symbol_list, add_pos_infos=False):
         """
         # 获取币安账户的实际持仓
         使用ccxt接口：fapiPrivate_get_positionrisk，获取账户持仓
@@ -277,6 +277,19 @@ class BinanceHandler:
         symbol_info = pd.DataFrame(index=symbol_list, columns=['当前持仓量'])
         symbol_info['当前持仓量'] = position_risk['当前持仓量']
         symbol_info['当前持仓量'].fillna(value=0, inplace=True)
+        if add_pos_infos:
+            # 持仓方向
+            symbol_info.loc[symbol_info['当前持仓量'] > 0, '持仓方向'] = 1
+            symbol_info.loc[symbol_info['当前持仓量'] < 0, '持仓方向'] = -1
+            symbol_info['持仓方向'].fillna(value=0, inplace=True)
+            # 权益
+            symbol_info['持仓收益'] = position_risk['unRealizedProfit']
+            symbol_info['持仓收益'].fillna(value=0, inplace=True)
+            # 价格
+            symbol_info['持仓均价'] = position_risk['entryPrice']
+            symbol_info['当前价格'] = position_risk['markPrice']
+            # 账户权益
+            symbol_info['账户权益'] = self.fetch_binance_swap_equity()
 
         return symbol_info
 

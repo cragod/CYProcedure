@@ -64,9 +64,9 @@ class BaseBrickCarrier(ABC):
         strategy: BaseExchangeStrategy = eval(strategy_cfg.strategy_name).strategy_with(strategy_cfg.parameters)
         return strategy
 
-    def _fetch_candle_for_strategy(self, coin_pair: CoinPair, time_frame: TimeFrame, limit):
+    def _fetch_candle_for_strategy(self, coin_pair: CoinPair, time_frame: TimeFrame, limit, tail=''):
         """取策略需要用的K线"""
-        candle_cls = candle_record_class_with_components(self._ccxt_provider.ccxt_object_for_fetching.name, coin_pair, time_frame)
+        candle_cls = candle_record_class_with_components(self._ccxt_provider.ccxt_object_for_fetching.name, coin_pair, time_frame, tail)
         # 取最后的 limit 条
         pipeline = [{
             '$sort': {

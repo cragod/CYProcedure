@@ -1,35 +1,28 @@
 import random
 import traceback
 import pytz
+import json
 from multiprocessing.pool import Pool
 from .base import *
-from ..exchange.okex import *
+from ..exchange.binance import *
 
 
 class BinanceUFutureBC(BaseBrickCarrier):
     """OK 合约单账户实盘执行流程"""
 
-    __symbol_info_columns = ['账户权益', '持仓方向', '持仓量', '持仓收益率', '持仓收益', '持仓均价', '当前价格', '最大杠杆']
+    # __symbol_info_columns = ['账户权益', '持仓方向', '持仓量', '持仓收益率', '持仓收益', '持仓均价', '当前价格', '最大杠杆']
     __symbol_info_df = None
-    __symbol_index_mapping = None
+    # __symbol_index_mapping = None
     __next_run_time = None
 
     def _did_init(self):
         """初始化结束，父类调用"""
-        self.__ok_handler = OKExHandler(self._ccxt_provider)
-        # {'eth-usdt': 'ETH-USDT-210326'}
-        self.__symbol_index_mapping = {name: coin_pair for name in coin_value_table for coin_pair in self._symbol_list if (name + '-').upper() in coin_pair.upper()}
-        # {'ETH-USDT-210326': 'eth-usdt'}
-        self.__symbol_index_reverse_mapping = {self.__symbol_index_mapping[name]: name for name in self.__symbol_index_mapping}
-
-    def __reset_infos(self):
-        self.__symbol_info_df = pd.DataFrame(index=self._symbol_list, columns=self.__symbol_info_columns)  # 转化为dataframe
+        self.__binance_handler = BinanceHandler(self._ccxt_provider)
 
     def perform_procedure(self):
         """主流程"""
         while True:
-            self.__reset_infos()
-            self.__symbol_info_df = self.__ok_handler.update_symbol_info(self.__symbol_info_df, self._symbol_list, self.__symbol_index_mapping)
+            self.__symbol_info_df = self.__binance_handler.update_symbol_info(list(map(lambda x: x.replace("/", ''), self._symbol_list)), add_pos_infos=True)
             # 把标的转为具体
             print('\nsymbol_info:\n', self.__symbol_info_df, '\n')
             # 计算每个策略的下次开始时间
@@ -71,9 +64,10 @@ class BinanceUFutureBC(BaseBrickCarrier):
             # 取K线
             while True:
                 time_frame = TimeFrame(cfg.time_interval)
-                candle_df = self._fetch_candle_for_strategy(ContractCoinPair.coin_pair_with(cfg.coin_pair, '-'),
+                candle_df = self._fetch_candle_for_strategy(ContractCoinPair.coin_pair_with(cfg.coin_pair, '/'),
                                                             time_frame,
-                                                            limit=strategy.candle_count_for_calculating)
+                                                            limit=strategy.candle_count_for_calculating,
+                                                            tail='_swap')
                 # 用来计算信号的，把最新这根删掉
                 cal_signal_df = candle_df[candle_df.candle_begin_time < current_time]
                 delta = current_time - cal_signal_df.iloc[-1].candle_begin_time.tz_convert(pytz.utc)
@@ -94,7 +88,8 @@ class BinanceUFutureBC(BaseBrickCarrier):
                 else:
                     break
             # 策略信号
-            signals = self.__calculate_signal(strategy, cal_signal_df, cfg.coin_pair, strategy_id=strategy_id)
+            coin_pair_str = cfg.coin_pair.replace('/', '')
+            signals = self.__calculate_signal(strategy, cal_signal_df, coin_pair_str, strategy_id=strategy_id)
             recorder.append_summary_log("**信号**: {}".format(signals))
             # 假信号逻辑
             # signals = self.__real_signal_random(cfg.coin_pair)
@@ -103,15 +98,17 @@ class BinanceUFutureBC(BaseBrickCarrier):
             order_infos = None
             if signals and not self._debug:  # 测试模式下不进
                 signal_price = candle_df.iloc[-1].close  # 最后一根K线的收盘价作为信号价
-                holding = self.__symbol_info_df.at[cfg.coin_pair, "持仓量"]
-                equity = self.__symbol_info_df.at[cfg.coin_pair, "账户权益"]
-                leverage = min(float(cfg.leverage), float(self.__symbol_info_df.at[cfg.coin_pair, "最大杠杆"]))
-                # 下单逻辑
-                order_ids = self.__ok_handler.okex_future_place_order(self.__symbol_index_reverse_mapping[cfg.coin_pair], cfg.coin_pair, signals, signal_price, holding, equity, leverage)
+                holding = self.__symbol_info_df.at[coin_pair_str, "持仓量"]
+                equity = self.__symbol_info_df.at[coin_pair_str, "账户权益"]
+                leverage = min(float(cfg.leverage), float(20))
+                # 下单逻辑 TODO
+                order_ids = None
+                # order_ids = self.__ok_handler.okex_future_place_order(self.__symbol_index_reverse_mapping[cfg.coin_pair], cfg.coin_pair, signals, signal_price, holding, equity, leverage)
                 print('{} 下单记录：\n'.format(cfg.coin_pair), order_ids)
                 # 更新订单信息，查看是否完全成交
                 time.sleep(self._short_sleep_time)  # 休息一段时间再更新订单信息
-                order_infos = self.__ok_handler.update_future_order_info(cfg.coin_pair, order_ids)
+                # TODO:
+                # order_infos = self.__ok_handler.update_future_order_info(cfg.coin_pair, order_ids)
                 print('更新下单记录：', '\n', order_infos)
             # 订单保存
             if order_infos is not None:
@@ -131,7 +128,7 @@ class BinanceUFutureBC(BaseBrickCarrier):
                 {'ETH-USDT-210326': {'账户权益': '61.61780297', '持仓方向': 0, '持仓量': nan, '持仓收益率': nan, '持仓收益': nan, '持仓均价': nan, '当前价格': 760.88, '最大杠杆': 10.0}}
                 '''
                 # 没有订单信息，记录一下本周期的仓位状态
-                info_dict = self.__symbol_info_df.loc[[cfg.coin_pair], :].T.to_dict()[cfg.coin_pair]
+                info_dict = self.__symbol_info_df.loc[[coin_pair_str], :].T.to_dict()[coin_pair_str]
                 recorder.append_summary_log("**账户权益**: {}".format(info_dict['账户权益']))
                 recorder.append_summary_log("**持仓方向**: {}".format(info_dict['持仓方向']))
                 if info_dict['持仓方向'] != 0:
