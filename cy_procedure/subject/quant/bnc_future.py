@@ -19,12 +19,14 @@ class BinanceUFutureBC(BaseBrickCarrier):
         """初始化结束，父类调用"""
         self.__binance_handler = BinanceHandler(self._ccxt_provider)
 
+    def refresh_symbol_infos(self):
+        self.__symbol_info_df = self.__binance_handler.update_symbol_info(list(map(lambda x: x.replace("/", ''), self._symbol_list)), add_pos_infos=True)
+        # 把标的转为具体
+        print('\nsymbol_info:\n', self.__symbol_info_df, '\n')
+
     def perform_procedure(self):
         """主流程"""
         while True:
-            self.__symbol_info_df = self.__binance_handler.update_symbol_info(list(map(lambda x: x.replace("/", ''), self._symbol_list)), add_pos_infos=True)
-            # 把标的转为具体
-            print('\nsymbol_info:\n', self.__symbol_info_df, '\n')
             # 计算每个策略的下次开始时间
             all_next_time_infos = self._all_next_run_time_infos()
             # 取最小的作为下次开始
@@ -40,6 +42,8 @@ class BinanceUFutureBC(BaseBrickCarrier):
                 while True:  # 在靠近目标时间时
                     if datetime.now() > self.__next_run_time:
                         break
+            # 开始前，更新一次仓位
+            self.refresh_symbol_infos()
             if self._debug:
                 # 测试直接全运行
                 to_run_strategie_ids = all_next_time_infos.keys()
