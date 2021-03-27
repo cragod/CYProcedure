@@ -56,7 +56,11 @@ class BinanceAIMS:
                 self.__recorder.record_exception("未抓取到今天的 K 线，稍后重试")
                 time.sleep(3)
             invest_ratio = self.calculate_signal()
-            self.handle_signal(invest_ratio)
+            if not self.__configuration.debug:
+                # debug 不下单
+                self.handle_signal(invest_ratio)
+            else:
+                print(invest_ratio)
         except Exception as e:
             self.__recorder.append_summary_log(str(e))
             if retry_time > 0:
