@@ -257,16 +257,10 @@ class BinanceSwapNeutral:
                 recorder.append_summary_log("**{}**".format(self._strategy.display_name))
                 # ===== 获取账户的实际持仓
                 symbol_info = self.__binance_handler.update_symbol_info(self.__symbol_list)
-                symbol_holding_list = list(json.loads(symbol_info[symbol_info['当前持仓量'] != 0].to_json()).values())
-                if len(symbol_holding_list) > 0:
-                    symbol_holding_dict = symbol_holding_list[0]
-                    str_list = ["{}: {}".format(x, symbol_holding_dict[x]) for x in symbol_holding_dict]
-                    recorder.append_summary_log("**当前持仓**: \n{}".format('\n'.join(str_list)))
                 # ===== 等待下次执行 (固定1h)
                 next_run_time = TimeFrame('1h').next_date_time_point()
                 print('下次执行时间:', next_run_time)
                 self.__sleep_to_next_run_time(next_run_time)
-                time.sleep(3 + randrange(3))  # TEST next_run_time = pd.to_datetime('2021-01-18 00:00:00').tz_localize(pytz.utc)
                 # ===== 计算旧的和新的策略分配资金
                 trade_usdt_old, trade_usdt_new = self.__cal_old_and_new_trade_usdt()
                 recorder.append_summary_log("**账户净值**: {} USDT".format(trade_usdt_new))

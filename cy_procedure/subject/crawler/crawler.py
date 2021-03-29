@@ -1,4 +1,5 @@
 import pytz
+import time
 from multiprocessing.pool import Pool
 from cy_data_access.util.convert import *
 from cy_data_access.models.market import *
@@ -18,11 +19,12 @@ class CandleRealtimeCrawler:
 
     __config_reader: CrawlerConfigReader
 
-    def __init__(self, config_reader, limit=10, duration=1, tolerance=2):
+    def __init__(self, config_reader, limit=10, duration=1, tolerance=2, start_second=47):
         self.__config_reader = config_reader
         self.__limit = limit
         self.__duration = duration  # 两次间隔
         self.__tolerance = tolerance  # 少几根不通过
+        self.__start_second = start_second  # 任务开始的秒数
 
     def __get_configs(self):
         """获取需要抓取的K线配置"""
@@ -33,11 +35,8 @@ class CandleRealtimeCrawler:
         start_time = datetime.now().astimezone(tz=pytz.utc)
         time_frame = config.time_frame
         coin_pair = config.coin_pair
-        while True:
+        for _ in range(5):  # 5 次，不行就算了
             try:
-                if (start_time.replace(second=0) + timedelta(minutes=self.__duration) - datetime.now().astimezone(tz=pytz.utc)).seconds < 15:
-                    print('{} {} 马上到下一个周期了，不试了'.format(config.coin_pair.formatted(), config.time_frame.value))
-                    return
                 df = ExchangeFetcher(self.__config_reader.ccxt_provider).fetch_real_time_candle_data(coin_pair, time_frame, self.__limit)
 
                 # 空的
@@ -50,8 +49,8 @@ class CandleRealtimeCrawler:
                 # 计算 delta
                 delta = start_time - df.iloc[-1].candle_begin_time
 
-                print(coin_pair.formatted(), df.shape[0], delta.total_seconds())
-                print(df[-1:])
+                # print(coin_pair.formatted(), df.shape[0], delta.total_seconds())
+                # print(df[-1:])
                 if time_frame.value.endswith('m'):
                     has_last = delta.total_seconds() < int(time_frame.value[:-1]) * 60 * self.__tolerance
                 elif time_frame.value.endswith('h'):
@@ -76,11 +75,13 @@ class CandleRealtimeCrawler:
     def __dispatch_task(self, configs):
         """分配任务"""
         try:
-            pool = Pool(processes=4)
+            start = time.time()
+            pool = Pool(processes=2)
             _ = pool.map(self.fetch_kline_and_save, configs)
         finally:
             pool.close()
             pool.join()
+            print('抓取任务用时: ', time.time() - start, '结束时间:', datetime.now())
 
     def run_crawling(self):
         configs = self.__get_configs()
@@ -88,9 +89,12 @@ class CandleRealtimeCrawler:
         while True:
             # 等待到下一次
             current_time = datetime.now().astimezone(tz=pytz.utc)
-            next_time = current_time.replace(second=0) + timedelta(minutes=self.__duration)
+            if current_time.second < self.__start_second - 5:
+                next_time = current_time.replace(second=self.__start_second)
+            else:
+                next_time = current_time.replace(second=self.__start_second) + timedelta(minutes=self.__duration)
             print('下次', self.__config_reader.name, next_time)
-            time.sleep(max(0, (next_time - current_time).seconds))
+            time.sleep(max(0, (next_time - datetime.now().astimezone(tz=pytz.utc)).seconds))
             while True:  # 在靠近目标时间时
                 if datetime.now().astimezone(tz=pytz.utc) > next_time:
                     break
