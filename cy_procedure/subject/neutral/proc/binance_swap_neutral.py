@@ -2,6 +2,7 @@ import pytz
 import time
 import traceback
 import json
+import multiprocessing as mp
 from random import randrange
 from datetime import datetime, timedelta
 from multiprocessing.pool import Pool
@@ -190,7 +191,7 @@ class BinanceSwapNeutral:
         arg_list = [(CoinPair.coin_pair_with(symbol), TimeFrame('1h'), limit, run_time) for symbol in self.__symbol_list_with_sep]
         # 多进程获取数据
         s_time = time.time()
-        with Pool(processes=2) as pl:
+        with Pool(processes=mp.cpu_count()) as pl:
             # 利用starmap启用多进程信息
             result = pl.starmap(self.fetch_candle_for_strategy, arg_list)
 
