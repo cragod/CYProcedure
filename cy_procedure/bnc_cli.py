@@ -27,7 +27,7 @@ def cybnc(ctx, db_user, db_pwd, db_host):
 def interests(cxt, begin, end, asset):
     connect_db_env(db_name=DB_CONFIG)
     # ccxt
-    ccxt_config = CCXTConfiguration.configuration_with(CCXTExchangeType.Binance)
+    ccxt_config = CCXTConfiguration.configuration_with_id(13)
     if ccxt_config is None:
         print("ccxt configuration not founded.")
         return
