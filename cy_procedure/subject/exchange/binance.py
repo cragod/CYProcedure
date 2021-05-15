@@ -185,7 +185,7 @@ class BinanceHandler:
                     # 案例：{'BTCUSDT': 3, 'ETHUSDT': 3, 'BCHUSDT': 3, 'XRPUSDT': 1, 'EOSUSDT': 1, 'LTCUSDT': 3, 'TRXUSDT': 0}
 
                     # 从exchange_info中获取每个币种下单精度
-                    self.__price_precision_info = {x['symbol']: int(math.log(float(x['filters'][0]['minPrice']), 0.1)) for x in exchange_info['symbols']}
+                    self.__price_precision_info = {x['symbol']: int(math.log(float(x['filters'][0]['tickSize']), 0.1)) for x in exchange_info['symbols']}
                     break
                 except Exception as _:
                     if i >= 4:
