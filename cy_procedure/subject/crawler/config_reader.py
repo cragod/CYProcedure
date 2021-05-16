@@ -62,6 +62,40 @@ class BinanceDeliveryCrawlerConfigReader(CrawlerConfigReader):
         return self.__provider
 
 
+class BinanceFutureCTACrawlerConfigReader(CrawlerConfigReader):
+    """币安择时 U 本位合约"""
+
+    def __init__(self):
+        super().__init__()
+        self.__provider = CCXTProvider("", "", ExchangeType.BinanceSpotFetching, {
+            'defaultType': 'future'
+        })
+
+    @property
+    def name(self):
+        return "Binance.Future.CTA"
+
+    @property
+    def configs(self):
+        return self._fetch_configs(CrawlerType.BNC_FUTURE_CTA)
+
+    @property
+    def ccxt_provider(self):
+        return self.__provider
+
+    def _fetch_configs(self, type: CrawlerType):
+        """Fetch + Convert to config"""
+        def mapper(item):
+            cfg = CrawlerItemConfig()
+            cfg.coin_pair = ContractCoinPair.coin_pair_with(item.coin_pair, type.separator)
+            cfg.time_frame = TimeFrame(item.time_frame)
+            cfg.exchange_name = self.ccxt_provider.display_name
+            cfg.coin_tail = '_cta'
+            return cfg
+        results = list(CrawlerRealtimeConfig.objects.raw({'exchange_type': type.value, 'active': True}))
+        return list(map(mapper, results))
+
+
 class BinanceFutureCrawlerConfigReader(CrawlerConfigReader):
     """币安 USDT 永续合约"""
 

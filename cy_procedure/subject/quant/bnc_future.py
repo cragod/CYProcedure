@@ -71,7 +71,7 @@ class BinanceUFutureBC(BaseBrickCarrier):
                 candle_df = self._fetch_candle_for_strategy(ContractCoinPair.coin_pair_with(cfg.coin_pair, '/'),
                                                             time_frame,
                                                             limit=strategy.candle_count_for_calculating,
-                                                            tail='_swap')
+                                                            tail='_cta')
                 # 用来计算信号的，把最新这根删掉
                 cal_signal_df = candle_df[candle_df.candle_begin_time < current_time]
                 delta = current_time - cal_signal_df.iloc[-1].candle_begin_time.tz_convert(pytz.utc)
