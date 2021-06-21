@@ -126,6 +126,8 @@ class BinanceUFutureBC(BaseBrickCarrier):
                     # 取订单各种状态
                     for o_inner_key in order_infos[order_id]:
                         recorder.append_summary_log("**{}**: {}".format(o_inner_key, order_infos[order_id][o_inner_key]))
+                    # 等 1s，区分开多个订单的时间
+                    time.sleep(self._short_sleep_time)
             else:
                 '''
                 {'BTC-USDT-210326': {'账户权益': '50', '持仓方向': 0, '持仓量': nan, '持仓收益率': nan, '持仓收益': nan, '持仓均价': nan, '当前价格': nan, '最大杠杆': nan}}
