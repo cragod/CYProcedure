@@ -54,7 +54,7 @@ class BaseBrickCarrier(ABC):
 
     @property
     def _generate_recorder(self):
-        return PersistenceRecorder(self.__wechat_token, MessageType.WeChatWork, self.__log_type)
+        return PersistenceRecorder(self.__wechat_token, MessageType.Telegram, self.__log_type)
 
     def _all_next_run_time_infos(self):
         """获取所有策略下一次执行时间"""
