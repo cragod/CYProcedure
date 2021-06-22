@@ -67,7 +67,7 @@ class BinanceSwapNeutral:
         if self._debug:
             return SimpleRecorder()
         else:
-            return PersistenceRecorder(self.__wechat_token, MessageType.WeChatWork, self.__log_type)
+            return PersistenceRecorder(self.__wechat_token, MessageType.Telegram, self.__log_type)
 
     def __fetch_symbol_list(self):
         # 更新一次 Symbols
