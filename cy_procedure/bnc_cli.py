@@ -20,7 +20,7 @@ def cybnc(ctx, db_user, db_pwd, db_host):
 
 
 @cybnc.command()
-@c.option('--begin', type=str, prompt="Begin date (e.g. 20201122)", default='20201122', required=True)
+@c.option('--begin', type=str, prompt="Begin date (e.g. 20201122)", default='20210917', required=True)
 @c.option('--end', type=str, prompt="End date (e.g. 20201122)", default='20301022', required=False)
 @c.option('--asset', type=str, prompt=True, required=True, default='USDT')
 @c.pass_context
@@ -42,7 +42,7 @@ def interests(cxt, begin, end, asset):
     for interest in interests[::-1]:
         daily_interest = float(interest['interest'])
         total += daily_interest
-        print(DateFormatter.convert_timestamp_to_string(interest['time'], "%Y%m%d"), daily_interest)
+        print(DateFormatter.convert_timestamp_to_string(int(interest['time']), "%Y%m%d"), daily_interest)
     print("Total:", total)
 
 
