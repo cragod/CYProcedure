@@ -78,7 +78,7 @@ class BinanceAIP(AIPBase):
         try:
             lending_product = self.__handler.daily_lending_product(coin)
             if lending_product is None:
-                self.recorder.append_summary_log('找不到 {coin} 活期产品')
+                print('找不到 {coin} 活期产品')
             else:
                 product_id = lending_product['productId']
                 print(lending_product)
@@ -86,6 +86,6 @@ class BinanceAIP(AIPBase):
                 if amount > 0:
                     result = self.__handler.purchase_daily_lending_product(product_id, amount).get('purchaseId')
                     if result is None:
-                        self.recorder.append_summary_log('购买 {coin} 活期失败')
+                        print('购买 {coin} 活期失败')
         except Exception as e:
-            self.recorder.append_summary_log(F'**划转 {coin} 到活期失败，{str(e)}**')
+            print(F'**划转 {coin} 到活期失败，{str(e)}**')
