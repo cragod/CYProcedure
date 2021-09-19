@@ -11,6 +11,10 @@ from cy_data_access.models.position import *
 
 
 class AIPBase:
+    precision_coefficient = 4
+    precision_amount = 6
+    precision_price = 6
+
     def __init__(self,
                  coin_pair: CoinPair,
                  time_frame,
@@ -21,7 +25,7 @@ class AIPBase:
                  invest_base_amount,
                  recorder: ProcedureRecorder,
                  debug=False,
-                 fee_percent=0.0015):
+                 fee_percent=0):
         """余币宝转出USDT + 定投买入 + 余币宝转入BTC
 
         Parameters
@@ -52,7 +56,7 @@ class AIPBase:
         self.trader_provicer = trader_provider
         self.recorder = recorder
         self.coin_pair = coin_pair
-        self.recorder.append_summary_log('**{} - 定投**'.format(coin_pair.formatted().upper()))
+        self.recorder.append_summary_log(F'**{coin_pair.formatted().upper()} - 定投**')
         self.fee_percent = fee_percent
         # 直接从远往近抓
         self.configuration = ExchangeFetchingConfiguration(
@@ -66,8 +70,15 @@ class AIPBase:
 
     def run_task(self):
         self.__fetch_candle()
+        # 1. 计算定投倍数
         invest_ratio = self.__calculate_signal()
-        if invest_ratio is not None and invest_ratio > 0 and self.invest_day == self.day_of_week:
+        # 2. 今天要不要定投（支持多天定投）
+        if isinstance(self.invest_day, list):
+            days = self.invest_day
+        else:
+            days = [self.invest_day]
+        # 3. 投丫的
+        if invest_ratio is not None and invest_ratio > 0 and self.day_of_week in days:
             self.__place_invest_order(invest_ratio)
         else:
             self.recorder.record_summary_log()
@@ -119,38 +130,35 @@ class AIPBase:
                                        ma_periods=self.ma_periods)
         signals = strategy.calculate_signals(self.__df, False)
         if self.configuration.debug:
-            print(signals[-200:])
+            print(signals[-5:])
         date_string = DateFormatter.convert_local_date_to_string(
             signals['candle_begin_time'][self.__df.index[-1]], "%Y-%m-%d")
-        actual_ratio = signals['high_change'][self.__df.index[-1]]
-        advance_ratio = signals['signal'][self.__df.index[-1]]
-        close_price = signals['close'][self.__df.index[-1]]
-        msg = """**日期**: {} \n
-**计算价格**: {} \n
-**市场信号**: {} \n
-**定投倍数**: {}
-""".format(date_string, round(close_price, 4), round(actual_ratio, 4), advance_ratio)
+        actual_ratio = round(signals['high_change'][self.__df.index[-1]], self.precision_coefficient)
+        advance_ratio = round(signals['signal'][self.__df.index[-1]], self.precision_coefficient)
+        close_price = round(signals['close'][self.__df.index[-1]], self.precision_price)
+        msg = F"""**日期**: {date_string} \n
+**计算F格**: {close_price} \n
+**市场信号**: {actual_ratio} \n
+**定投倍数**: {advance_ratio}"""
         self.recorder.append_summary_log(msg)
         return advance_ratio
 
     def __place_invest_order(self, ratio):
         # 实际定投数
         invest_amount = ratio * self.__invest_base_amount
-        self.recorder.append_summary_log('**定投额**({} * {}): {} {}'.format(self.__invest_base_amount,
-                                                                          ratio, invest_amount, self.coin_pair.base_coin.upper()))
+        invest_amount = round(invest_amount, self.precision_amount)
+        self.recorder.append_summary_log(
+            F'**定投额**({self.__invest_base_amount} * {ratio}): {invest_amount} {self.coin_pair.base_coin.upper()}')
         self.__invest_proccess(invest_amount)
 
     def __invest_proccess(self, invest_amount):
         """下单流程"""
         # 交易前准备(e.g. 余币宝取钱出来)
-        try:
-            self._prepare_to_buying(invest_amount)
-        except:
-            return
+        self._prepare_to_buying(invest_amount)
         # 基础币余额
         base_coin_amount = self._fetch_base_coin_balance()
         if base_coin_amount < invest_amount:
-            self.recorder.record_summary_log('**{}不足以定投**'.format(self.coin_pair.base_coin.upper()))
+            self.recorder.record_summary_log(F'**{self.coin_pair.base_coin.upper()}不足以定投**')
             return
         # 下单
         response = self._place_buying_order(invest_amount)
@@ -159,14 +167,14 @@ class AIPBase:
             self.recorder.record_summary_log('**下单失败**')
             return
         # order info
-        price = response['price']
-        cost = response['cost']
-        order_amount = response['amount']
-        msg = """**下单价格**: {} \n
-**下单总价**: {} \n
-**买入数量**: {}
-""".format(round(price, 6), round(cost, 6), round(order_amount, 8))
-        # database record
+        price = round(response['price'], self.precision_price)
+        cost = round(response['cost'], self.precision_price)
+        order_amount = round(response['amount'], self.precision_amount)
+        msg = F"""**下单价格**: {price} \n
+**下单总价**: {cost} \n
+**买入数量**: {order_amount}
+"""
+        # 添加记录到数据库
         record = AIPRecord()
         record.exchange = self.trader_provicer.display_name
         record.coin_pair = self.coin_pair.formatted().upper()
@@ -177,24 +185,30 @@ class AIPBase:
         # log
         self.recorder.append_summary_log(msg)
         # 收尾工作(e.g. 两种币转回余币宝)
-        remaining_base_coin = round(invest_amount - cost, 6)  # 保留 6 位
-        self._finishing_aip(remaining_base_coin, order_amount)
+        remaining_base_coin = round(invest_amount - cost, self.precision_amount)
+        self._finishing_aip(remaining_base_coin)
         self.recorder.record_summary_log('**定投成功**')
 
     def _fetch_base_coin_balance(self):
         """基础币余额"""
         balance = self.trader_provicer.ccxt_object_for_fetching.fetch_balance()
         base_coin_balance = balance['free'][self.coin_pair.base_coin]
-        return base_coin_balance
+        return round(base_coin_balance, self.precision_amount)
 
-    @abstractmethod
+    def _fetch_trade_coin_balance(self):
+        """目标币余额"""
+        balance = self.trader_provicer.ccxt_object_for_fetching.fetch_balance()
+        base_coin_balance = balance['free'][self.coin_pair.trade_coin]
+        return round(base_coin_balance, self.precision_amount)
+
+    @ abstractmethod
     def _prepare_to_buying(self, invest_amount):
         """下单前准备，失败自行记录:
         self.recorder.record_summary_log('**划转{}失败**'.format(self.coin_pair.base_coin.upper()))
         """
         raise NotImplementedError("Not implemented")
 
-    @abstractmethod
+    @ abstractmethod
     def _place_buying_order(self, invest_amount):
         """下单，成功返回：
         {
@@ -204,12 +218,12 @@ class AIPBase:
         }"""
         raise NotImplementedError("Not implemented")
 
-    @abstractmethod
+    @ abstractmethod
     def _rollback_when_order_failed(self, invest_amount):
         """下单失败后回滚"""
         raise NotImplementedError("Not implemented")
 
-    @abstractmethod
-    def _finishing_aip(self, remaining_base_coin_amount, order_amount):
+    @ abstractmethod
+    def _finishing_aip(self, remaining_base_coin_amount):
         """完成定投后的收尾工作"""
         raise NotImplementedError("Not implemented")
