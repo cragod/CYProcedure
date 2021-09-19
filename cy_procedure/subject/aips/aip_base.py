@@ -133,9 +133,9 @@ class AIPBase:
             print(signals[-5:])
         date_string = DateFormatter.convert_local_date_to_string(
             signals['candle_begin_time'][self.__df.index[-1]], "%Y-%m-%d")
-        actual_ratio = self.__truncate(signals['high_change'][self.__df.index[-1]], self.precision_coefficient)
-        advance_ratio = self.__truncate(signals['signal'][self.__df.index[-1]], self.precision_coefficient)
-        close_price = self.__truncate(signals['close'][self.__df.index[-1]], self.precision_price)
+        actual_ratio = self._truncate(signals['high_change'][self.__df.index[-1]], self.precision_coefficient)
+        advance_ratio = self._truncate(signals['signal'][self.__df.index[-1]], self.precision_coefficient)
+        close_price = self._truncate(signals['close'][self.__df.index[-1]], self.precision_price)
         msg = F"""**日期**: {date_string} \n
 **计算价格**: {close_price} \n
 **市场信号**: {actual_ratio} \n
@@ -146,7 +146,7 @@ class AIPBase:
     def __place_invest_order(self, ratio):
         # 实际定投数
         invest_amount = ratio * self.__invest_base_amount
-        invest_amount = self.__truncate(invest_amount, self.precision_amount)
+        invest_amount = self._truncate(invest_amount, self.precision_amount)
         self.recorder.append_summary_log(
             F'**定投额**({self.__invest_base_amount} * {ratio}): {invest_amount} {self.coin_pair.base_coin.upper()}')
         self.__invest_proccess(invest_amount)
@@ -167,9 +167,9 @@ class AIPBase:
             self.recorder.record_summary_log('**下单失败**')
             return
         # order info
-        price = self.__truncate(response['price'], self.precision_price)
-        cost = self.__truncate(response['cost'], self.precision_price)
-        order_amount = self.__truncate(response['amount'], self.precision_amount)
+        price = self._truncate(response['price'], self.precision_price)
+        cost = self._truncate(response['cost'], self.precision_price)
+        order_amount = self._truncate(response['amount'], self.precision_amount)
         msg = F"""**下单价格**: {price} \n
 **下单总价**: {cost} \n
 **买入数量**: {order_amount}
@@ -185,11 +185,11 @@ class AIPBase:
         # log
         self.recorder.append_summary_log(msg)
         # 收尾工作(e.g. 两种币转回余币宝)
-        remaining_base_coin = self.__truncate(invest_amount - cost, self.precision_amount)
+        remaining_base_coin = self._truncate(invest_amount - cost, self.precision_amount)
         self._finishing_aip(remaining_base_coin)
         self.recorder.record_summary_log('**定投成功**')
 
-    def __truncate(self, n, decimals=0):
+    def _truncate(self, n, decimals=0):
         multiplier = 10 ** decimals
         return int(n * multiplier) / multiplier
 
@@ -197,13 +197,13 @@ class AIPBase:
         """基础币余额"""
         balance = self.trader_provicer.ccxt_object_for_fetching.fetch_balance()
         base_coin_balance = balance['free'][self.coin_pair.base_coin]
-        return self.__truncate(base_coin_balance, self.precision_amount)
+        return self._truncate(base_coin_balance, self.precision_amount)
 
     def _fetch_trade_coin_balance(self):
         """目标币余额"""
         balance = self.trader_provicer.ccxt_object_for_fetching.fetch_balance()
         base_coin_balance = balance['free'][self.coin_pair.trade_coin]
-        return self.__truncate(base_coin_balance, self.precision_amount)
+        return self._truncate(base_coin_balance, self.precision_amount)
 
     @ abstractmethod
     def _prepare_to_buying(self, invest_amount):

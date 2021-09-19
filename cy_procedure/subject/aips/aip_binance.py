@@ -21,12 +21,10 @@ class BinanceAIP(AIPBase):
         self.__handler = BinanceHandler(trader_provider)
 
     def _prepare_to_buying(self, invest_amount):
-        """下单前准备，失败自行记录:
-        self.recorder.record_summary_log('**划转{}失败**'.format(self.coin_pair.base_coin.upper()))
-        """
+        """下单前准备，失败自行记录"""
         try:
             spot_balance = self._fetch_base_coin_balance()
-            amount_difference = self.__truncate(invest_amount - spot_balance, self.precision_amount)
+            amount_difference = self._truncate(invest_amount - spot_balance, self.precision_amount)
             if amount_difference > 0:
                 # 取活期产品
                 lending_product = self.__handler.daily_lending_product(self.coin_pair.base_coin)
