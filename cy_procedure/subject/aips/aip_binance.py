@@ -26,7 +26,7 @@ class BinanceAIP(AIPBase):
         """
         try:
             spot_balance = self._fetch_base_coin_balance()
-            amount_difference = round(invest_amount - spot_balance, self.precision_amount)
+            amount_difference = self.__truncate(invest_amount - spot_balance, self.precision_amount)
             if amount_difference > 0:
                 # 取活期产品
                 lending_product = self.__handler.daily_lending_product(self.coin_pair.base_coin)
