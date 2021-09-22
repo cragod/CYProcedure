@@ -148,7 +148,7 @@ class AIPBase:
         invest_amount = ratio * self.__invest_base_amount
         invest_amount = self._truncate(invest_amount, self.precision_amount)
         self.recorder.append_summary_log(
-            F'**定投额**({self.__invest_base_amount} * {ratio}): {invest_amount} {self.coin_pair.base_coin.upper()}')
+            F'**定投额**({self.__invest_base_amount} x {ratio}): {invest_amount} {self.coin_pair.base_coin.upper()}')
         self.__invest_proccess(invest_amount)
 
     def __invest_proccess(self, invest_amount):
