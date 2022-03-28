@@ -136,7 +136,7 @@ class BinanceAIMS:
             self.handle_buying(signal * self.__invest_base_amount)
         else:
             position = self.__position
-            open_price = self.__df.iloc[-1][COL_OPEN]
+            open_price = self.__df.iloc[-1][COL_CLOSE]
             # P/L
             pol = open_price / (position.cost / position.hold) if position.hold > 0 else 0
             if pol > self.__sell_threshold:
