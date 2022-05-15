@@ -67,3 +67,31 @@ def instruments_fund_rates(cxt):
             DateFormatter.convert_timestamp_to_string(info['nextFundingTime'], "%H:%M:%S"),
             DateFormatter.convert_timestamp_to_string(info['time'], "%H:%M:%S")
         ))
+
+
+@cybnc.command()
+@c.pass_context
+def u_future_position(cxt):
+    # ccxt
+    connect_db_env(db_name=DB_CONFIG)
+    ccxt_config = CCXTConfiguration.configuration_with_id(16)
+    if ccxt_config is None:
+        print("ccxt configuration not founded.")
+        return
+    provider = CCXTProvider(ccxt_config.app_key, ccxt_config.app_secret, ExchangeType.Binance)
+
+    account = provider.ccxt_object_for_query.fapiPrivateV2_get_account()
+    balance_df = pd.DataFrame()
+    balance_df.loc[0, 'totalWalletBalance'] = float(account['totalWalletBalance'])
+    balance_df.loc[0, 'totalUnrealizedProfit'] = float(account['totalUnrealizedProfit'])
+    balance_df.loc[0, 'totalMarginBalance'] = float(account['totalMarginBalance'])
+    pos_df = pd.DataFrame(account['positions'])
+    # 只保留实际持仓的数据
+    pos_df = pos_df[pos_df['entryPrice'].astype(float) > 0]
+    pos_df = pos_df[['symbol', 'unrealizedProfit', 'entryPrice', 'positionAmt', 'notional']]
+    for col in ['unrealizedProfit', 'entryPrice', 'positionAmt', 'notional']:
+        pos_df[col] = pos_df[col].astype(float)
+    balance_df, pos_df
+
+    print('余额信息：\n', balance_df)
+    print('仓位信息：\n', pos_df)
