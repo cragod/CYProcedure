@@ -85,13 +85,13 @@ def u_future_position(cxt):
     balance_df.loc[0, 'totalWalletBalance'] = float(account['totalWalletBalance'])
     balance_df.loc[0, 'totalUnrealizedProfit'] = float(account['totalUnrealizedProfit'])
     balance_df.loc[0, 'totalMarginBalance'] = float(account['totalMarginBalance'])
+    balance_df['unrealizedPnlPercent'] = balance_df['totalUnrealizedProfit'] / balance_df['totalWalletBalance']
     pos_df = pd.DataFrame(account['positions'])
     # 只保留实际持仓的数据
     pos_df = pos_df[pos_df['entryPrice'].astype(float) > 0]
     pos_df = pos_df[['symbol', 'unrealizedProfit', 'entryPrice', 'positionAmt', 'notional']]
     for col in ['unrealizedProfit', 'entryPrice', 'positionAmt', 'notional']:
         pos_df[col] = pos_df[col].astype(float)
-    balance_df, pos_df
 
-    print('余额信息：\n', balance_df)
+    print('余额信息：\n', balance_df.T)
     print('仓位信息：\n', pos_df)
