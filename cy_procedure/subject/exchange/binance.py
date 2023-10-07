@@ -420,7 +420,7 @@ class BinanceHandler:
         :return:
         """
         # 获取原始数据
-        position_risk = self.__ccxt_provider.ccxt_object_for_query.fapiPrivate_get_positionrisk()
+        position_risk = self.__ccxt_provider.ccxt_object_for_query.fapiPrivateV2_get_positionrisk()
 
         # 将原始数据转化为dataframe
         position_risk = pd.DataFrame(position_risk, dtype='float')
