@@ -203,7 +203,7 @@ class BinanceHandler:
         获取币安永续合约账户的当前净值
         """
         # 获取当前账户净值
-        balance = self.__ccxt_provider.ccxt_object_for_query.fapiPrivate_get_balance()  # 获取账户净值
+        balance = self.__ccxt_provider.ccxt_object_for_query.fapiPrivateV2_get_balance()  # 获取账户净值
         balance = pd.DataFrame(balance)
         equity = float(balance[balance['asset'] == 'USDT']['balance'])
         return equity
